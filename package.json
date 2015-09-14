@@ -1,0 +1,35 @@
+{
+  "name": "into-cartodb",
+  "version": "1.0.0",
+  "description": "for streaming arbitrarily sized streams into cartodb",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test.js | tnyan"
+  },
+  "keywords": [
+    "cartodb",
+    "stream",
+    "import",
+    "geo",
+    "geospatial",
+    "gis"
+  ],
+  "author": "Calvin W. Metcalf <calvin.metcalf@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "cartodb-tools": "^2.3.3",
+    "cartodb-uploader": "^2.0.1",
+    "first-n-stream": "^2.0.0",
+    "node-uuid": "^1.4.3",
+    "once": "^1.3.2",
+    "readable-stream": "^2.0.2"
+  },
+  "devDependencies": {
+    "tap-nyan": "0.0.2",
+    "tape": "^4.2.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:calvinmetcalf/into-cartodb.git"
+  }
+}
