@@ -72,6 +72,7 @@ function part2(db, table, origTable, toUser, done) {
 }
 module.exports = intoCartoDB;
 function intoCartoDB(user, key, table, method, done) {
+  table = table.toLowerCase();
   if (typeof method === 'function') {
     done = method;
     method = 'create';
