@@ -17,6 +17,7 @@
   "author": "Calvin W. Metcalf <calvin.metcalf@gmail.com>",
   "license": "MIT",
   "dependencies": {
+    "bluebird": "^2.10.0",
     "cartodb-tools": "^2.3.3",
     "cartodb-uploader": "^2.0.1",
     "first-n-stream": "^2.0.0",
