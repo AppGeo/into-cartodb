@@ -17,7 +17,7 @@ function append(db, table, toUser, cb) {
     });
 }
 var createTemptTable = Bluebird.coroutine(function * createTemptTable(table, db){
-  var id = `temp_${uuid().replace(/-/g, '_')}`;
+  var id = `${table}_temp_${uuid().replace(/-/g, '_')}`;
   yield db.raw(`
       create table ${id} as table ${table} with no data;
   `);

@@ -29,7 +29,7 @@
     "once": "^1.3.2",
     "proj4geojson": "^1.1.0",
     "readable-stream": "^2.0.2",
-    "shapefile": "calvinmetcalf/shapefile#8fd190eee25c34062ef9f085327cffd9c693d19e",
+    "shp-stream": "^1.0.0",
     "yargs": "^3.25.0"
   },
   "devDependencies": {

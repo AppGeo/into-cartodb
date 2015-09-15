@@ -7,19 +7,19 @@ var uploader = require('./');
 var JsonStream = require('jsonstream3');
 var csv = require('csv-parser');
 var Transform = require('readable-stream').Transform;
-var shapefile = require('shapefile').reader;
+var shapefile = require('shp-stream').reader;
 var Proj4Geojson = require('proj4geojson');
 var argv = require('yargs')
-  .usage('$0 [-f path/to/file.ext] [-n filename.ext] [-a apikey] [-u username] [-t tablename] [path/to/file.ext]')
+  .usage('$0 [-f path/to/file.ext] [-n filename.ext] [-k key] [-u username] [-t tablename] [path/to/file.ext]')
   .alias('f', 'file')
-  .describe('f', 'specify file to upload, -f flag is optional'.yellow)
+  .describe('f', 'specify file to upload'.yellow)
   .alias('n', 'name')
   .describe('n', 'upload from stdin as file'.yellow).alias('u', 'user')
   .describe('u', 'specify cartodb username'.yellow)
   .default('u', null, '$CARTODB_USER_NAME')
-  .alias('a', 'apikey')
-  .describe('a', 'specify cartodb apikey'.yellow)
-  .default('a', null, '$CARTODB_API_KEY')
+  .alias('k', 'key')
+  .describe('k', 'specify cartodb api key'.yellow)
+  .default('k', null, '$CARTODB_API_KEY')
   .alias('m', 'method')
   .default('m', 'create')
   .describe('m', 'choose import type'.yellow)
@@ -27,11 +27,17 @@ var argv = require('yargs')
   .alias('t', 'table')
   .describe('t', 'tablename in cartodb'.yellow)
   .default('t', null, 'filename minus extention')
+  .alias('r', 'replace')
+  .describe('r', 'switch to replace mode')
+  .alias('a', 'append')
+  .describe('a', 'switch to append mode')
+  .alias('c', 'create')
+  .describe('c', 'switch to create mode')
   .help('h', 'Show Help'.yellow)
   .alias('h', 'help')
   .argv;
 
-var key = argv.apikey;
+var key = argv.key;
 if (key === null) {
   key = process.env.CARTODB_API_KEY;
 }
@@ -84,11 +90,23 @@ function toGeoJson() {
   return new Transform({
     objectMode: true,
     transform: function (chunk, _, next) {
-      this.push({
+      var out = {
         type: 'Feature',
         properties: chunk,
         geometry: null
-      });
+      };
+      if (typeof chunk.lat === 'number' && (typeof chunk.lon === 'number' || typeof chunk.lng === 'number')) {
+        out.geometry = {
+          type: 'point',
+          coordinates: [chunk.lat, chunk.lon || chunk.lng]
+        };
+      } else if (typeof chunk.x === 'number' && typeof chunk.y === 'number') {
+        out.geometry = {
+          type: 'point',
+          coordinates: [chunk.x, chunk.y]
+        };
+      }
+      this.push(out);
       next();
     }
   });
@@ -140,7 +158,19 @@ function transformStream (path) {
     }
   });
 }
-middleStream.pipe(uploader(user, key, tablename, argv.m, function (err) {
+function getMethod() {
+  if (argv.c) {
+    return 'create';
+  }
+  if (argv.a) {
+    return 'append';
+  }
+  if (argv.r) {
+    return 'replace';
+  }
+  return argv.m;
+}
+middleStream.pipe(uploader(user, key, tablename, getMethod(), function (err) {
   if (err) {
     console.log((err.stack || err.toString()).red);
     process.exit(8);// eslint-disable-line no-process-exit
