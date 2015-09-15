@@ -72,6 +72,7 @@ Supported formats are
 - csv
 - json
 - .shp
+- .kml
 
 Caveats:
 
@@ -79,6 +80,7 @@ Caveats:
 - the only geometry supported by .csv and .json are points encoded in fields named x and y or lat and lon (or lng). These must be WGS84 lat lons (even for x y).
 - .json must have an array of objects as the top level element (aka not the same as geojson).
 - shapefile must not be zipped.
+- .kml, no .kmz, no styles, and only extended data
 
 # programic api
 

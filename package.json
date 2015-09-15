@@ -25,6 +25,7 @@
     "duplexify": "^3.4.2",
     "first-n-stream": "^2.0.0",
     "jsonstream3": "^3.0.0",
+    "kml-stream": "^1.0.0",
     "node-uuid": "^1.4.3",
     "once": "^1.3.2",
     "proj4geojson": "^1.1.0",

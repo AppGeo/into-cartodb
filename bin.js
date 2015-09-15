@@ -9,6 +9,7 @@ var csv = require('csv-parser');
 var Transform = require('readable-stream').Transform;
 var shapefile = require('shp-stream').reader;
 var Proj4Geojson = require('proj4geojson');
+var Kml = require('kml-stream');
 var argv = require('yargs')
   .usage('$0 [-f path/to/file.ext] [-n filename.ext] [-k key] [-u username] [-t tablename] [path/to/file.ext]')
   .alias('f', 'file')
@@ -116,6 +117,8 @@ function getMiddleStream(name) {
   switch(ext) {
     case '.geojson':
       return instream.pipe(JsonStream.parse('features.*'));
+    case '.kml':
+      return instream.pipe(new Kml());
     case '.csv':
       return instream.pipe(csv()).pipe(toGeoJson());
     case '.json':
