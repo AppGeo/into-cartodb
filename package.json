@@ -6,6 +6,7 @@
   "scripts": {
     "test": "node test.js | tnyan"
   },
+  "bin": "bin.js",
   "keywords": [
     "cartodb",
     "stream",
@@ -31,7 +32,8 @@
     "proj4geojson": "^1.1.0",
     "readable-stream": "^2.0.2",
     "shp-stream": "^1.0.0",
-    "yargs": "^3.25.0"
+    "yargs": "^3.25.0",
+    "yauzl": "^2.3.1"
   },
   "devDependencies": {
     "tap-nyan": "0.0.2",

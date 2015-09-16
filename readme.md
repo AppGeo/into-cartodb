@@ -68,11 +68,13 @@ Create mode throws an error if the table already exists in cartodb, replace and 
 
 Supported formats are
 
-- geojson
-- csv
-- json
+- .geojson
+- .csv
+- .json
 - .shp
 - .kml
+- .kmz
+- .zip
 
 Caveats:
 
@@ -80,7 +82,9 @@ Caveats:
 - the only geometry supported by .csv and .json are points encoded in fields named x and y or lat and lon (or lng). These must be WGS84 lat lons (even for x y).
 - .json must have an array of objects as the top level element (aka not the same as geojson).
 - shapefile must not be zipped.
-- .kml, no .kmz, no styles, and only extended data
+- .kml, no styles, and only extended data
+- .kmz, same as .kml but additionally like .shp must come from file system not stdin
+- a .zip must be a path on the filesystem (no stdin) and may contain any other format (except .kmz), if the zip has more then one valid file then use the -n parameter to specify which one otherwise it'll pick the first one it can find.
 
 # programic api
 

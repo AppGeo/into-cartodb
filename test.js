@@ -1,3 +1,4 @@
+'use strict';
 var test = require('tape');
 var intoCartodb = require('./');
 var auth = require('./auth.json');
