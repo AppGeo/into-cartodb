@@ -89,7 +89,7 @@ if (argv.n) {
   }
 }
 var tablename = argv.t || path.basename(name, path.extname(name));
-var middleStream = getMiddleStream(fileName);
+var middleStream = getMiddleStream(fileName || name);
 function toGeoJson() {
   return new Transform({
     objectMode: true,
