@@ -6,6 +6,7 @@ var Bluebird = require('bluebird');
 var FirstN = require('first-n-stream');
 var Transform = require('readable-stream').Transform;
 var uuid = require('node-uuid');
+var inherits = require('inherits');
 module.exports = intoCartoDB;
 function append(db, table, toUser, cb) {
   return db.createWriteStream(table, {
@@ -161,9 +162,85 @@ function intoCartoDB(user, key, table, method, done) {
       });
     } else if (method === 'replace') {
       return createTemptTable(table, db).then(function (id) {
-        toUser.pipe(part2(db, id, table, true, toUser, cb));
+        toUser.pipe(new Validator(id, db)).pipe(part2(db, id, table, true, toUser, cb));
       });
     }
   }).catch(cb);
   return toUser;
 }
+inherits(Validator, Transform);
+function Validator(id, db) {
+  Transform.call(this, {
+    objectMode: true
+  });
+  this.schema = db(db.raw('INFORMATION_SCHEMA.COLUMNS')).select('column_name', 'data_type')
+  .where('table_name', id )
+  .whereNotIn('column_name', ['cartodb_id', 'the_geom_webmercator', 'created_at', 'updated_at', 'the_geom']).then(function (data) {
+    var out = new Map();
+    data.forEach(function (item) {
+      out.set(item.column_name, item.data_type);
+    });
+    return out;
+  });
+  this.nope = Symbol('nope');
+}
+Validator.prototype._transform = function (chunk, _, next) {
+  var self = this;
+  var props = chunk.properties;
+  chunk.properties = {};
+  this.schema.then(function (schema) {
+    Object.keys(props).forEach(function (key) {
+      if (!schema.has(key)) {
+        return;
+      }
+      var typed = self.coerceType(props[key], schema.get(key));
+      if (typed === self.nope) {
+        return;
+      }
+      chunk.properties[key] = typed;
+    });
+    self.push(chunk);
+    next();
+  }).catch(next);
+};
+
+Validator.prototype.coerceType = function (value, type) {
+  if (typeof value === 'undefined') {
+    return this.nope;
+  }
+  var out;
+  switch(type) {
+    case 'text':
+      out = String(value);
+      if (!out) {
+        return this.nope;
+      }
+      return out;
+    case 'double precision':
+      out = parseFloat(value);
+      if (out !== out) {
+        return this.nope;
+      }
+      return out;
+    case 'integer':
+    case 'bigint':
+      out = parseInt(value, 10);
+      if (out !== out) {
+        return this.nope;
+      }
+      return out;
+    case 'timestamp with time zone':
+      out = new Date(value);
+      if (out.toString() === 'Invalid Date') {
+        return this.nope;
+      }
+      return out;
+    case 'boolean':
+      if (value === 'NULL') {
+        return this.nope;
+      }
+      return Boolean(value);
+    default:
+      return this.nope;
+  }
+};
