@@ -4,11 +4,11 @@ var cartodb = require('cartodb-tools');
 var uploader = require('cartodb-uploader');
 var Bluebird = require('bluebird');
 var FirstN = require('first-n-stream');
-var PassThrough = require('readable-stream').PassThrough;
+var Transform = require('readable-stream').Transform;
 var uuid = require('node-uuid');
 function append(db, table, toUser, cb) {
   return db.createWriteStream(table, {
-    batchSize: 100
+    batchSize: 50
   })
     .once('error', cb)
     .once('uploaded', cb)
@@ -17,7 +17,7 @@ function append(db, table, toUser, cb) {
     });
 }
 var createTemptTable = Bluebird.coroutine(function * createTemptTable(table, db){
-  var id = `${table}_temp_${uuid().replace(/-/g, '_')}`;
+  var id = `${table.slice(0, 21)}_temp_${uuid().replace(/-/g, '_')}`;
   yield db.raw(`
       create table ${id} as table ${table} with no data;
   `);
@@ -77,8 +77,17 @@ function intoCartoDB(user, key, table, method, done) {
     done = method;
     method = 'create';
   }
-  var toUser = new PassThrough({
-    objectMode: true
+  var toUser = new Transform({
+    objectMode: true,
+    transform: function (chunk, _, next) {
+      var oldProps = chunk.properties;
+      chunk.properties = {};
+      Object.keys(oldProps).forEach(function (key) {
+        chunk.properties[key.toLowerCase()] = oldProps[key];
+      });
+      this.push(chunk);
+      next();
+    }
   });
   var cb = once(function (err, resp) {
     if (err) {

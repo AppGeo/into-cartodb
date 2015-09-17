@@ -19,7 +19,7 @@
   "license": "MIT",
   "dependencies": {
     "bluebird": "^2.10.0",
-    "cartodb-tools": "^2.3.3",
+    "cartodb-tools": "^2.3.4",
     "cartodb-uploader": "^2.0.1",
     "colors": "^1.1.2",
     "csv-parser": "^1.7.0",
