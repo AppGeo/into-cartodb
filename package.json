@@ -6,7 +6,10 @@
   "scripts": {
     "test": "node test.js | tnyan"
   },
-  "bin": "bin.js",
+  "bin": {
+    "in2cartodb": "./bin.js",
+    "into-cartodb": "./bin.js"
+  },
   "keywords": [
     "cartodb",
     "stream",
