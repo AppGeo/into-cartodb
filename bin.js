@@ -25,6 +25,8 @@ var argv = require('yargs')
   .alias('k', 'key')
   .describe('k', 'specify cartodb api key'.yellow)
   .default('k', null, '$CARTODB_API_KEY')
+  .alias('C', 'cleanup')
+  .describe('C', 'clean up tempt tables'.yellow)
   .alias('m', 'method')
   .default('m', 'create')
   .describe('m', 'choose import type'.yellow)
@@ -61,6 +63,19 @@ if (!user) {
   process.stdout.write('username is required, please pass the -u option or set CARTODB_USER_NAME'.red);
   process.stdout.write('\n');
   exit += 2;
+}
+if (!exit && argv.C) {
+  return uploader.cleanUpTempTables(user, key).then(function (num) {
+    if (num === 0) {
+      process.stdout.write(`no tables to clean up\n`.green);
+    } else {
+      process.stdout.write(`cleaned up ${num} tables\n`.green);
+    }
+    process.exit(0);// eslint-disable-line no-process-exit
+  }).catch(function (e) {
+    process.stdout.write((e && e.stack || e || 'fail').red);
+    process.exit(49);// eslint-disable-line no-process-exit
+  });
 }
 if (!argv.f && !argv.n && !argv._[0]) {
   process.stdout.write('name or file is required'.red);

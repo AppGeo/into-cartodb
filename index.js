@@ -6,6 +6,7 @@ var Bluebird = require('bluebird');
 var FirstN = require('first-n-stream');
 var Transform = require('readable-stream').Transform;
 var uuid = require('node-uuid');
+module.exports = intoCartoDB;
 function append(db, table, toUser, cb) {
   return db.createWriteStream(table, {
     batchSize: 50
@@ -23,7 +24,27 @@ var createTemptTable = Bluebird.coroutine(function * createTemptTable(table, db)
   `);
   return id;
 });
-var swap = Bluebird.coroutine(function * swap(table, tempTable, db) {
+var cleanUpTempTables = Bluebird.coroutine(function * cleanUp(user, key) {
+  var db = cartodb(user, key);
+  var done = 0;
+  var tables = yield db(db.raw('INFORMATION_SCHEMA.tables')).select('table_name')
+ .where('table_name', 'like', `%\_temp\_________\_____\_____\_____\_____________`)
+ .groupBy('table_name');
+  if (!tables.length) {
+    return 0;
+  }
+  tables = tables.map(function (item) {
+    return item.table_name;
+  });
+  for (let name of tables) {
+    yield db.schema.dropTableIfExists(name);
+    ++done;
+    console.log(done, name);
+  }
+  return done;
+});
+module.exports.cleanUpTempTables = cleanUpTempTables;
+var swap = Bluebird.coroutine(function * swap(table, tempTable, remove, db) {
   let fields = yield db(db.raw('INFORMATION_SCHEMA.COLUMNS')).select('column_name')
   .where({
     table_name: tempTable // eslint-disable-line camelcase
@@ -34,7 +55,7 @@ var swap = Bluebird.coroutine(function * swap(table, tempTable, db) {
   }).join();
   return db.raw(`
     BEGIN;
-      DELETE from ${table};
+      ${remove ? '' : `DELETE from ${table}`};
       INSERT into ${table} (${fields}) SELECT ${fields} from ${tempTable};
       DROP TABLE ${tempTable};
     COMMIT;
@@ -57,7 +78,7 @@ function exists(name, db) {
     return resp[0].count;
   });
 }
-function part2(db, table, origTable, toUser, done) {
+function part2(db, table, origTable, remove, toUser, done) {
   return append(db, table, toUser, function (err) {
      if (err) {
        return done(err);
@@ -65,12 +86,12 @@ function part2(db, table, origTable, toUser, done) {
      if (!origTable) {
        return done();
      }
-     swap(origTable, table, db).then(function () {
+     swap(origTable, table, remove, db).then(function () {
        done();
      }).catch(done);
    });
 }
-module.exports = intoCartoDB;
+
 function intoCartoDB(user, key, table, method, done) {
   table = table.toLowerCase();
   if (typeof method === 'function') {
@@ -119,7 +140,9 @@ function intoCartoDB(user, key, table, method, done) {
             return cb(err);
           }
           toUser.emit('inserted', resp.length);
-          out.pipe(part2(db, table, false, toUser, cb));
+          return createTemptTable(table, db).then(function (id) {
+            out.pipe(part2(db, id, table, false, toUser, cb));
+          });
         });
         resp.forEach(function (item) {
           uploadStream.write(item);
@@ -133,10 +156,12 @@ function intoCartoDB(user, key, table, method, done) {
       throw new Error('table must exist');
     }
     if (method === 'append') {
-      toUser.pipe(part2(db, table, false, toUser, cb));
+      return createTemptTable(table, db).then(function (id) {
+        toUser.pipe(part2(db, id, table, false, toUser, cb));
+      });
     } else if (method === 'replace') {
       return createTemptTable(table, db).then(function (id) {
-        toUser.pipe(part2(db, id, table, toUser, cb));
+        toUser.pipe(part2(db, id, table, true, toUser, cb));
       });
     }
   }).catch(cb);

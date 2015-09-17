@@ -64,7 +64,7 @@ into-cartodb -f path/to/file.ext --create
 into-cartodb -f path/to/file.ext -c
 ```
 
-Create mode throws an error if the table already exists in cartodb, replace and append modes throw an error if the table does not exist yet, replace won't leave your table in an inconsistent state if it fails (i.g. you stop it) but it will leave an extra table in your account.
+Create mode throws an error if the table already exists in cartodb, replace and append modes throw an error if the table does not exist yet.
 
 Supported formats are
 
@@ -85,6 +85,11 @@ Caveats:
 - .kml, no styles, and only extended data
 - .kmz, same as .kml but additionally like .shp must come from file system not stdin
 - a .zip must be a path on the filesystem (no stdin) and may contain any other format (except .kmz), if the zip has more then one valid file then use the -n parameter to specify which one otherwise it'll pick the first one it can find.
+
+This tool uploads to a temp table and then inserts them into the table after all rows have been uploaded, this is MUCH faster then importing directly to the table but if the upload doesn't finish can lead to a two minor issues.
+
+1. orphan and invisible temp tables hanging around, you can delete these by using the `-C` (aka `-cleanup`) option from the command line which will drop all these.
+2. a failed creation of a new table will leave a rump table of only 50 rows in cartodb, you'll need to delete that manually.
 
 # programic api
 
