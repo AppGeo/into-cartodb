@@ -154,7 +154,7 @@ function intoCartoDB(user, key, table, method, done) {
       if (count !== 0) {
         throw new Error('table already exists');
       }
-      let out = new FirstN(50, function (err, resp) {
+      let out = new FirstN(100, function (err, resp) {
         if (err) {
           return cb(err);
         }
@@ -165,9 +165,12 @@ function intoCartoDB(user, key, table, method, done) {
           if (err) {
             return cb(err);
           }
-          toUser.emit('inserted', resp.length);
           return createTemptTable(table, db).then(function (id) {
-            out.pipe(part2(db, id, table, false, toUser, cb));
+            var nextPart = part2(db, id, table, true, toUser, cb);
+            resp.forEach(function (item) {
+              nextPart.write(item);
+            });
+            out.pipe(nextPart);
           });
         });
         resp.forEach(function (item) {
