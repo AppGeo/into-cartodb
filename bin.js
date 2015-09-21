@@ -98,7 +98,8 @@ if (argv.n) {
   if (!fileName) {
     var ext = path.extname(name);
     if (ext === '.shp' || ext === '.zip' || ext === '.kmz') {
-      console.log(('must use full path with ' + ext).red);
+      process.stdout.write(('must use full path with ' + ext).red);
+      process.stdout.write('\n');
       process.exit(12);// eslint-disable-line no-process-exit
     }
   }
@@ -145,9 +146,9 @@ function unzipKmz() {
     if (err) {
       return out.emit('error', err);
     }
-    zipfile.on('entry', function(entry) {
+    zipfile.on('entry', function (entry) {
       if (/\.kml$/.test(entry.fileName)) {
-        zipfile.openReadStream(entry, function(err, readStream) {
+        zipfile.openReadStream(entry, function (err, readStream) {
           if (err) {
             return out.emit('error', err);
           }
@@ -167,14 +168,14 @@ function unzipZip() {
       return out.emit('error', err);
     }
     var files = new Map();
-    zipfile.on('entry', function(entry) {
+    zipfile.on('entry', function (entry) {
       if (/\/$/.test(entry.fileName) || /^__MACOSX/.test(entry.fileName)) {
         // directory file names end with '/'
         return;
       }
       files.set(entry.fileName, entry);
     });
-    zipfile.on('end', function() {
+    zipfile.on('end', function () {
       finishUp(files, out, zipfile);
     });
   });
@@ -205,7 +206,8 @@ function finishUp(files, out, zipfile) {
   }
   if (!primary) {
     zipfile.close();
-    console.log('not valid file inside zip'.red);
+    process.stdout.write('\nnot valid file inside zip'.red);
+    process.stdout.write('\n');
     process.exit(15); // eslint-disable-line no-process-exit
   }
   var ext = path.extname(primary);
@@ -220,7 +222,8 @@ function finishUp(files, out, zipfile) {
   }
   if (ext !== '.shp') {
     zipfile.close();
-    console.log(('invalid type ' + ext).red);
+    process.stdout.write(('\ninvalid type ' + ext).red);
+    process.stdout.write('\n');
     process.exit(16); // eslint-disable-line no-process-exit
   }
   getShapeBits(primary, files, zipfile, function (err, res) {
@@ -328,7 +331,8 @@ function getMiddleStream(name, thing) {
     case '.zip':
       return unzipZip();
     default:
-      console.log(('unknown file type: ' + ext).red);
+      process.stdout.write(('\nunknown file type: ' + ext).red);
+      process.stdout.write('\n');
       process.exit(9);// eslint-disable-line no-process-exit
   }
 }
@@ -349,7 +353,7 @@ function makeObject(path, noFile) {
     });
   });
 }
-function transformStream (path, noFile) {
+function transformStream(path, noFile) {
   var obj = makeObject(path, noFile);
   return new Transform({
     objectMode: true,
@@ -377,10 +381,12 @@ function getMethod() {
 var total = 0;
 middleStream.pipe(uploader(user, key, tablename, getMethod(), function (err) {
   if (err) {
-    console.log((err.stack || err.toString()).red);
+    process.stdout.writeconsole.log((err.stack || err.toString()).red);
+    process.stdout.write('\n');
     process.exit(8);// eslint-disable-line no-process-exit
   }
-  console.log('\ndone'.green);
+  process.stdout.write('\ndone'.green);
+  process.stdout.write('\n');
   process.exit(0);// eslint-disable-line no-process-exit
 })).on('inserted', function (n) {
   total += n;

@@ -7,6 +7,7 @@ var FirstN = require('first-n-stream');
 var Transform = require('readable-stream').Transform;
 var uuid = require('node-uuid');
 var inherits = require('inherits');
+var debug = require('debug')('into-cartodb');
 module.exports = intoCartoDB;
 function append(db, table, toUser, cb) {
   return db.createWriteStream(table, {
@@ -40,7 +41,6 @@ var cleanUpTempTables = Bluebird.coroutine(function * cleanUp(user, key) {
   for (let name of tables) {
     yield db.schema.dropTableIfExists(name);
     ++done;
-    console.log(done, name);
   }
   return done;
 });
@@ -50,14 +50,39 @@ var swap = Bluebird.coroutine(function * swap(table, tempTable, remove, db) {
   .where({
     table_name: tempTable // eslint-disable-line camelcase
   })
-  .whereNotIn('column_name', ['cartodb_id', 'the_geom_webmercator', 'created_at', 'updated_at']);
+  .whereNotIn('column_name', ['cartodb_id', 'the_geom_webmercator', 'created_at', 'updated_at', 'the_geom']);
   fields = fields.map(function (item) {
     return item.column_name;
-  }).join();
+  });
+  var insertFields;
+  var hasGeom = yield db(tempTable).select(db.raw('bool_or(the_geom is not null) as hasgeom'));
+  hasGeom = hasGeom.length === 1 && hasGeom[0].hasgeom;
+  if (hasGeom) {
+    debug('has geometry');
+    let allValid = yield db(tempTable).select(db.raw('bool_and(st_isvalid(the_geom)) as allvalid'));
+    allValid = allValid.length === 1 && allValid[0].allvalid;
+    if (allValid) {
+      debug('geometry is all valid');
+      fields.push('the_geom');
+      insertFields = fields.join(',');
+      fields = fields.join(',');
+    } else {
+      debug('has invalid geometry');
+      fields.push('the_geom');
+      insertFields = fields.join(',');
+      fields.pop();
+      fields.push('ST_MakeValid(the_geom) as the_geom');
+      fields = fields.join(',');
+    }
+  } else {
+    debug('no geometry');
+    insertFields = fields.join(',');
+    fields = fields.join(',');
+  }
   return db.raw(`
     BEGIN;
       ${remove ? '' : `DELETE from ${table}`};
-      INSERT into ${table} (${fields}) SELECT ${fields} from ${tempTable};
+      INSERT into ${table} (${insertFields}) SELECT ${fields} from ${tempTable};
       DROP TABLE ${tempTable};
     COMMIT;
   `);
