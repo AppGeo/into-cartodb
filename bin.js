@@ -381,7 +381,7 @@ function getMethod() {
 var total = 0;
 middleStream.pipe(uploader(user, key, tablename, getMethod(), function (err) {
   if (err) {
-    process.stdout.writeconsole.log((err.stack || err.toString()).red);
+    process.stdout.write((err.stack || err.toString()).red);
     process.stdout.write('\n');
     process.exit(8);// eslint-disable-line no-process-exit
   }

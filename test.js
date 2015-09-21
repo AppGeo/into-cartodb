@@ -127,10 +127,14 @@ test('crud', function (t) {
   });
   t.test('create less then 50', function (t) {
     var inserted = 0;
-    t.plan(2);
+    t.plan(4);
     var stream = intoCartodb(auth.user, auth.key, table, function (err) {
       t.error(err, 'no error');
       t.equals(inserted, 40);
+      cartodb(table).count('num').exec(function (err, resp) {
+        t.error(err);
+        t.deepEquals(resp, [{count: 40}]);
+      });
     });
     stream.on('inserted', function (num) {
       inserted += num;

@@ -81,7 +81,7 @@ var swap = Bluebird.coroutine(function * swap(table, tempTable, remove, db) {
   }
   return db.raw(`
     BEGIN;
-      ${remove ? '' : `DELETE from ${table}`};
+      ${remove ? `DELETE from ${table}` : ''};
       INSERT into ${table} (${insertFields}) SELECT ${fields} from ${tempTable};
       DROP TABLE ${tempTable};
     COMMIT;
