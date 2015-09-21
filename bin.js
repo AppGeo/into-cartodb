@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 'use strict';
 require('colors');
 var readline = require('readline');
@@ -15,33 +16,34 @@ var yauzl = require('yauzl');
 var Proj4Geojson = require('proj4geojson');
 var Kml = require('kml-stream');
 var argv = require('yargs')
-  .usage('$0 [-f path/to/file.ext] [-n filename.ext] [-k key] [-u username] [-t tablename] [path/to/file.ext]')
+  .usage('Usage:\n\  $0 [-Crac] [-f file] [-u cartodb username] [-k cartodb api key]  [-t output table name]')
+  .boolean('C')
+  .alias('C', 'cleanup')
+  .describe('C', 'clean up temp tables on cartodb'.yellow)
+  .boolean('r')
+  .alias('r', 'replace')
+  .describe('r', 'use replace mode'.yellow)
+  .boolean('a')
+  .alias('a', 'append')
+  .describe('a', 'use append mode'.yellow)
+  .boolean('c')
+  .alias('c', 'create')
+  .describe('c', 'use create mode'.yellow)
+  .demand('f')
   .alias('f', 'file')
-  .describe('f', 'specify file to upload'.yellow)
-  .alias('n', 'name')
-  .describe('n', 'upload from stdin as file'.yellow).alias('u', 'user')
-  .describe('u', 'specify cartodb username'.yellow)
+  .describe('f', 'file to upload'.yellow)
+  .alias('u', 'user')
+  .describe('u', 'cartodb username'.yellow)
   .default('u', null, '$CARTODB_USER_NAME')
   .alias('k', 'key')
-  .describe('k', 'specify cartodb api key'.yellow)
+  .describe('k', 'cartodb api key'.yellow)
   .default('k', null, '$CARTODB_API_KEY')
-  .alias('C', 'cleanup')
-  .describe('C', 'clean up temp tables'.yellow)
-  .alias('m', 'method')
-  .default('m', 'create')
-  .describe('m', 'choose import type'.yellow)
-  .choices('m', ['create', 'append', 'replace'])
+  .string('t')
   .alias('t', 'table')
-  .describe('t', 'tablename in cartodb'.yellow)
-  .default('t', null, 'filename minus extention')
-  .alias('r', 'replace')
-  .describe('r', 'switch to replace mode'.yellow)
-  .alias('a', 'append')
-  .describe('a', 'switch to append mode'.yellow)
-  .alias('c', 'create')
-  .describe('c', 'switch to create mode'.yellow)
+  .describe('t', 'output tablename in cartodb'.yellow)
   .help('h', 'Show Help'.yellow)
   .alias('h', 'help')
+  .example('$0 -c -f ./test.csv -t test1', 'Create table test1 from test.csv'.green)
   .argv;
 
 var key = argv.key;
@@ -65,16 +67,16 @@ if (!user) {
   exit += 2;
 }
 if (!exit && argv.C) {
-  return uploader.cleanUpTempTables(user, key).then(function (num) {
+  return uploader.cleanUpTempTables(user, key).then(function(num) {
     if (num === 0) {
       process.stdout.write(`no tables to clean up\n`.green);
     } else {
       process.stdout.write(`cleaned up ${num} tables\n`.green);
     }
-    process.exit(0);// eslint-disable-line no-process-exit
-  }).catch(function (e) {
+    process.exit(0); // eslint-disable-line no-process-exit
+  }).catch(function(e) {
     process.stdout.write((e && e.stack || e || 'fail').red);
-    process.exit(49);// eslint-disable-line no-process-exit
+    process.exit(49); // eslint-disable-line no-process-exit
   });
 }
 if (!argv.f && !argv.n && !argv._[0]) {
@@ -84,7 +86,7 @@ if (!argv.f && !argv.n && !argv._[0]) {
 }
 
 if (exit) {
-  process.exit(exit);// eslint-disable-line no-process-exit
+  process.exit(exit); // eslint-disable-line no-process-exit
 }
 var fileName = argv.f || argv._[0];
 var name;
@@ -99,16 +101,17 @@ if (argv.n) {
     var ext = path.extname(name);
     if (ext === '.shp' || ext === '.zip' || ext === '.kmz') {
       console.log(('must use full path with ' + ext).red);
-      process.exit(12);// eslint-disable-line no-process-exit
+      process.exit(12); // eslint-disable-line no-process-exit
     }
   }
 }
 var tablename = argv.t || path.basename(name, path.extname(name));
 var middleStream = getMiddleStream(fileName || name);
+
 function toGeoJson() {
   return new Transform({
     objectMode: true,
-    transform: function (chunk, _, next) {
+    transform: function(chunk, _, next) {
       var out = {
         type: 'Feature',
         properties: chunk,
@@ -130,6 +133,7 @@ function toGeoJson() {
     }
   });
 }
+
 function getStream(thing) {
   if (thing) {
     return thing;
@@ -139,9 +143,12 @@ function getStream(thing) {
   }
   return process.stdin;
 }
+
 function unzipKmz() {
   var out = new PassThrough();
-  yauzl.open(fileName, {autoClose: false}, function (err, zipfile){
+  yauzl.open(fileName, {
+    autoClose: false
+  }, function(err, zipfile) {
     if (err) {
       return out.emit('error', err);
     }
@@ -158,11 +165,14 @@ function unzipKmz() {
   });
   return out;
 }
+
 function unzipZip() {
   var out = new PassThrough({
     objectMode: true
   });
-  yauzl.open(fileName, {autoClose: false}, function (err, zipfile){
+  yauzl.open(fileName, {
+    autoClose: false
+  }, function(err, zipfile) {
     if (err) {
       return out.emit('error', err);
     }
@@ -180,6 +190,7 @@ function unzipZip() {
   });
   return out;
 }
+
 function toArray(thing) {
   var out = [];
   for (let value of thing) {
@@ -189,17 +200,18 @@ function toArray(thing) {
 }
 var easyTypes = ['.geojson', '.kml', '.csv', '.json'];
 var allTypes = easyTypes.concat('.shp');
+
 function finishUp(files, out, zipfile) {
   var keys = toArray(files.keys());
   var primary;
   if (argv.n) {
     let re = new RegExp(argv.n.replace(/\./g, '\\.') + '$');
-    primary = keys.filter(function (item) {
+    primary = keys.filter(function(item) {
       return item.toLowerCase().match(re);
     })[0];
   }
   if (!primary) {
-    primary = keys.filter(function (item) {
+    primary = keys.filter(function(item) {
       return allTypes.indexOf(path.extname(item) > -1);
     })[0];
   }
@@ -210,7 +222,7 @@ function finishUp(files, out, zipfile) {
   }
   var ext = path.extname(primary);
   if (easyTypes.indexOf(ext) > -1) {
-    return zipfile.openReadStream(files.get(primary), function (err, stream) {
+    return zipfile.openReadStream(files.get(primary), function(err, stream) {
       if (err) {
         return out.emit('error', err);
       }
@@ -223,7 +235,7 @@ function finishUp(files, out, zipfile) {
     console.log(('invalid type ' + ext).red);
     process.exit(16); // eslint-disable-line no-process-exit
   }
-  getShapeBits(primary, files, zipfile, function (err, res) {
+  getShapeBits(primary, files, zipfile, function(err, res) {
     if (err) {
       return out.emit('error', err);
     }
@@ -239,13 +251,14 @@ function finishUp(files, out, zipfile) {
     zipfile.close();
   });
 }
+
 function getShapeBits(primary, files, zipfile, cb) {
   var done = 0;
   var out = {};
   var e;
   var base = path.join(path.dirname(primary), path.basename(primary, '.shp'));
   if (files.has(base + '.prj')) {
-    zipfile.openReadStream(files.get(base + '.prj'), function (err, stream) {
+    zipfile.openReadStream(files.get(base + '.prj'), function(err, stream) {
       if (e) {
         return;
       }
@@ -255,9 +268,9 @@ function getShapeBits(primary, files, zipfile, cb) {
         return;
       }
       var prj = '';
-      stream.on('data', function (d) {
+      stream.on('data', function(d) {
         prj += d.toString();
-      }).on('end', function () {
+      }).on('end', function() {
         if (e) {
           return;
         }
@@ -270,7 +283,7 @@ function getShapeBits(primary, files, zipfile, cb) {
     done++;
   }
   if (files.has(base + '.dbf')) {
-    zipfile.openReadStream(files.get(base + '.dbf'), function (err, stream) {
+    zipfile.openReadStream(files.get(base + '.dbf'), function(err, stream) {
       if (e) {
         return;
       }
@@ -287,7 +300,7 @@ function getShapeBits(primary, files, zipfile, cb) {
     e = new Error('must include dbf');
     return cb(e);
   }
-  zipfile.openReadStream(files.get(primary), function (err, stream) {
+  zipfile.openReadStream(files.get(primary), function(err, stream) {
     if (e) {
       return;
     }
@@ -300,15 +313,17 @@ function getShapeBits(primary, files, zipfile, cb) {
     done++;
     maybeFinish();
   });
+
   function maybeFinish() {
     if (done === 3 && !e) {
       cb(null, out);
     }
   }
 }
+
 function getMiddleStream(name, thing) {
   var ext = path.extname(name);
-  switch(ext) {
+  switch (ext) {
     case '.geojson':
       return getStream(thing).pipe(JsonStream.parse('features.*'));
     case '.kml':
@@ -329,18 +344,21 @@ function getMiddleStream(name, thing) {
       return unzipZip();
     default:
       console.log(('unknown file type: ' + ext).red);
-      process.exit(9);// eslint-disable-line no-process-exit
+      process.exit(9); // eslint-disable-line no-process-exit
   }
 }
+
 function makeObject(path, noFile) {
   if (noFile) {
     return Promise.resolve(new Proj4Geojson(path, true));
   }
-  return new Promise(function (yes) {
-    fs.readFile(path, {encoding: 'utf8'}, function (err, file) {
+  return new Promise(function(yes) {
+    fs.readFile(path, {
+      encoding: 'utf8'
+    }, function(err, file) {
       if (err) {
         return yes({
-          feature: function (thing) {
+          feature: function(thing) {
             return thing;
           }
         });
@@ -349,19 +367,21 @@ function makeObject(path, noFile) {
     });
   });
 }
-function transformStream (path, noFile) {
+
+function transformStream(path, noFile) {
   var obj = makeObject(path, noFile);
   return new Transform({
     objectMode: true,
-    transform: function (chunk, _, next) {
+    transform: function(chunk, _, next) {
       var self = this;
-      obj.then(function (transformer) {
+      obj.then(function(transformer) {
         self.push(transformer.feature(chunk));
         next();
       });
     }
   });
 }
+
 function getMethod() {
   if (argv.c) {
     return 'create';
@@ -375,16 +395,17 @@ function getMethod() {
   return argv.m;
 }
 var total = 0;
-middleStream.pipe(uploader(user, key, tablename, getMethod(), function (err) {
+middleStream.pipe(uploader(user, key, tablename, getMethod(), function(err) {
   if (err) {
     console.log((err.stack || err.toString()).red);
-    process.exit(8);// eslint-disable-line no-process-exit
+    process.exit(8); // eslint-disable-line no-process-exit
   }
   console.log('\ndone'.green);
-  process.exit(0);// eslint-disable-line no-process-exit
-})).on('inserted', function (n) {
+  process.exit(0); // eslint-disable-line no-process-exit
+})).on('inserted', function(n) {
   total += n;
 });
+
 function clearLine() {
   readline.clearLine(process.stdout, 0);
   readline.cursorTo(process.stdout, 0);
@@ -393,6 +414,7 @@ function clearLine() {
 // based upon https://github.com/helloIAmPau/node-spinner
 var spinner = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏';
 var stage = 0;
+
 function updateCli() {
   clearLine();
   process.stdout.write('inserted ' + total + ' ' + spinner[stage] + '   ');
