@@ -8,6 +8,7 @@ var Transform = require('readable-stream').Transform;
 var uuid = require('node-uuid');
 var inherits = require('inherits');
 var debug = require('debug')('into-cartodb');
+var sanatize = require('./sanatize');
 module.exports = intoCartoDB;
 function append(db, table, toUser, cb) {
   return db.createWriteStream(table, {
@@ -19,6 +20,7 @@ function append(db, table, toUser, cb) {
       toUser.emit('inserted', num);
     });
 }
+
 var createTemptTable = Bluebird.coroutine(function * createTemptTable(table, db){
   var id = `${table.slice(0, 21)}_temp_${uuid().replace(/-/g, '_')}`;
   yield db.raw(`
@@ -119,7 +121,7 @@ function part2(db, table, origTable, remove, toUser, done) {
 }
 
 function intoCartoDB(user, key, table, method, done) {
-  table = table.toLowerCase();
+  table = sanatize(table).slice(0, 63);
   if (typeof method === 'function') {
     done = method;
     method = 'create';
@@ -130,7 +132,7 @@ function intoCartoDB(user, key, table, method, done) {
       var oldProps = chunk.properties;
       chunk.properties = {};
       Object.keys(oldProps).forEach(function (key) {
-        chunk.properties[key.toLowerCase()] = oldProps[key];
+        chunk.properties[sanatize(key)] = oldProps[key];
       });
       this.push(chunk);
       next();
