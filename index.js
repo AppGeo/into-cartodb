@@ -24,7 +24,7 @@ function append(db, table, toUser, cb) {
 var createTemptTable = Bluebird.coroutine(function * createTemptTable(table, db){
   var id = `${table.slice(0, 21)}_temp_${uuid().replace(/-/g, '_')}`;
   yield db.raw(`
-      create table ${id} as table ${table} with no data;
+      create table ${id} as table "${table}" with no data;
   `);
   return id;
 });

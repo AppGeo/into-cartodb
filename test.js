@@ -3,9 +3,9 @@ var test = require('tape');
 var intoCartodb = require('./');
 var auth = require('./auth.json');
 var cartodb = require('cartodb-tools')(auth.user, auth.key);
-
+var crypto = require('crypto');
 test('crud', function (t) {
-  var table = 'test_table_into_carto';
+  var table = 'test_table_into_carto' + crypto.randomBytes(8).toString('hex');
   t.test('maybe delete', function (t) {
     t.plan(1);
     cartodb.schema.dropTableIfExists(table).exec(function (err) {
@@ -29,7 +29,11 @@ test('crud', function (t) {
     var stream = intoCartodb(auth.user, auth.key, table, function (err) {
       t.error(err, 'no error');
       t.equals(inserted, 160);
-      t.end();
+      cartodb(table).select().where('foo_blahoela', 'foo_blahoela').where('_as', '_as').where('fooo', 'fooo').exec(function (err, resp) {
+        t.error(err, 'no error');
+        t.equals(resp.length, 160);
+        t.end();
+      });
     });
     stream.on('inserted', function (num) {
       t.ok(true, 'inserted');
@@ -40,8 +44,12 @@ test('crud', function (t) {
       stream.write({
         type: 'Feature',
         properties: {
-          num: i
-        },
+          num: i,
+          1: 1,
+          'foo.blahœla': 'foo_blahoela',
+          '<foo>as': '_as',
+          '?#fooo': 'fooo'
+          },
         geometry: null
       });
     }
@@ -150,5 +158,11 @@ test('crud', function (t) {
       });
     }
     stream.end();
+  });
+  t.test('maybe delete', function (t) {
+    t.plan(1);
+    cartodb.schema.dropTableIfExists(table).exec(function (err) {
+      t.error(err, 'no error');
+    });
   });
 });
