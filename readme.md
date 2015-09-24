@@ -94,9 +94,18 @@ This tool uploads to a temp table and then inserts them into the table after all
 # programic api
 
 ```js
-var writeStream = intoCartoDB(user, key, table, method, callback);
+var writeStream = intoCartoDB(user, key, table, options, callback);
 ```
 
-`user` and `key` are the cartodb credentials, `table` is the destination table, `method` is one of `'create'`, `'append'`, or `'replace'` (default create) which selects the table creation strategy and `callback` which is called when the data is fully inserted into cartodb.  Note that listening for the streams `finish` event is not sufficient for knowing that it is fully uploaded due to the stream being buffered internally, if the callback is omitted then one can listen for the `uploaded` event.  Additionally an `inserted` event is emitted which tells you when features are successfully inserted, the event object is an integer telling you how many.
+`user` and `key` are the cartodb credentials, `table` is the destination table, `options` is an object with various config options, if it's a string it's assumed to be method which is one of `'create'`, `'append'`, or `'replace'` (default create) which selects the table creation strategy and `callback` which is called when the data is fully inserted into cartodb.  Note that listening for the streams `finish` event is not sufficient for knowing that it is fully uploaded due to the stream being buffered internally, if the callback is omitted then one can listen for the `uploaded` event.  Additionally an `inserted` event is emitted which tells you when features are successfully inserted, the event object is an integer telling you how many.
 
 Returned stream is an object stream which takes geojson features, geometry may be null.
+
+Other options besides method which are supported include
+
+- validations: an array of Promise returning functions, called in order with 3 arguments
+    - the name of the table in cartodb
+    - a map where each entries key is the field name to be inserted into the main table and the value is the value to get it out of the temp table
+    - a [cartodb-tools](https://github.com/calvinmetcalf/cartodb) database object (same api as [knex]() minus transactions)
+
+  If the promise rejects that the temporary table is cleaned up (and the stub table is cleaned up for create operations).  The field map works by the key being the name of the field to insert into the table and the value being the expressions in sql.  For instance usually the geometry value is the same as the key `the_geom` but if the geometry needs to be fixed it is instead `ST_MakeValid(the_geom) as the_geom`. 

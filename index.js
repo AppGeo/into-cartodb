@@ -46,17 +46,7 @@ var cleanUpTempTables = Bluebird.coroutine(function * cleanUp(user, key) {
   }
   return done;
 });
-module.exports.cleanUpTempTables = cleanUpTempTables;
-var swap = Bluebird.coroutine(function * swap(table, tempTable, remove, db) {
-  let fields = yield db(db.raw('INFORMATION_SCHEMA.COLUMNS')).select('column_name')
-  .where({
-    table_name: tempTable // eslint-disable-line camelcase
-  })
-  .whereNotIn('column_name', ['cartodb_id', 'the_geom_webmercator', 'created_at', 'updated_at', 'the_geom']);
-  fields = fields.map(function (item) {
-    return item.column_name;
-  });
-  var insertFields;
+var fixGeom = Bluebird.coroutine(function * fixGeom(tempTable, fields, db) {
   var hasGeom = yield db(tempTable).select(db.raw('bool_or(the_geom is not null) as hasgeom'));
   hasGeom = hasGeom.length === 1 && hasGeom[0].hasgeom;
   if (hasGeom) {
@@ -65,26 +55,65 @@ var swap = Bluebird.coroutine(function * swap(table, tempTable, remove, db) {
     allValid = allValid.length === 1 && allValid[0].allvalid;
     if (allValid) {
       debug('geometry is all valid');
-      fields.push('the_geom');
-      insertFields = fields.join(',');
-      fields = fields.join(',');
+      fields.set('the_geom', 'the_geom');
     } else {
       debug('has invalid geometry');
-      fields.push('the_geom');
-      insertFields = fields.join(',');
-      fields.pop();
-      fields.push('ST_MakeValid(the_geom) as the_geom');
-      fields = fields.join(',');
+      fields.set('the_geom', 'ST_MakeValid(the_geom) as the_geom');
     }
-  } else {
-    debug('no geometry');
-    insertFields = fields.join(',');
-    fields = fields.join(',');
   }
+});
+function getValidations(config) {
+  if (!config.validations || !Array.isArray(config.validations) || !config.validations.length) {
+    return [fixGeom];
+  } else {
+    return [fixGeom].concat(config.validations);
+  }
+}
+module.exports.cleanUpTempTables = cleanUpTempTables;
+var validate = Bluebird.coroutine(function * validate(tempTable, _fields, config, db) {
+  let fields = new Map();
+  _fields.forEach(function (field) {
+    fields.set(field, field);
+  });
+  var validations = getValidations(config);
+  for (let validation of validations) {
+    yield validation(tempTable, fields, db);
+  }
+  return fields;
+});
+var swap = Bluebird.coroutine(function * swap(table, tempTable, remove, db, config) {
+  let fields = yield db(db.raw('INFORMATION_SCHEMA.COLUMNS')).select('column_name')
+  .where({
+    table_name: tempTable // eslint-disable-line camelcase
+  })
+  .whereNotIn('column_name', ['cartodb_id', 'the_geom_webmercator', 'created_at', 'updated_at', 'the_geom']);
+  fields = fields.map(function (item) {
+    return item.column_name;
+  });
+  var newFields, out;
+  try {
+    newFields = yield validate(tempTable, fields, config, db);
+  } catch(e) {
+    debug(e);
+    if (config.method === 'create') {
+      out = db.raw(`DROP TABLE ${table}, ${tempTable};`);
+    } else {
+      out = db.raw(`DROP TABLE ${tempTable};`);
+    }
+    return out.then(function () {
+      return Promise.reject(e || new Error('validation failed'));
+    });
+  }
+  var fromFields = [];
+  var toFields = [];
+  newFields.forEach(function (value, key) {
+    fromFields.push(value);
+    toFields.push(key);
+  });
   return db.raw(`
     BEGIN;
       ${remove ? `DELETE from ${table}` : ''};
-      INSERT into ${table} (${insertFields}) SELECT ${fields} from ${tempTable};
+      INSERT into ${table} (${toFields.join(',')}) SELECT ${fromFields.join(',')} from ${tempTable};
       DROP TABLE ${tempTable};
     COMMIT;
   `);
@@ -106,7 +135,7 @@ function exists(name, db) {
     return resp[0].count;
   });
 }
-function part2(db, table, origTable, remove, toUser, done) {
+function part2(db, table, origTable, remove, toUser, config, done) {
   return append(db, table, toUser, function (err) {
      if (err) {
        return done(err);
@@ -114,18 +143,26 @@ function part2(db, table, origTable, remove, toUser, done) {
      if (!origTable) {
        return done();
      }
-     swap(origTable, table, remove, db).then(function () {
+     swap(origTable, table, remove, db, config).then(function () {
        done();
      }).catch(done);
    });
 }
 
-function intoCartoDB(user, key, table, method, done) {
+function intoCartoDB(user, key, table, options, done) {
   table = sanatize(table).slice(0, 63);
-  if (typeof method === 'function') {
-    done = method;
-    method = 'create';
+  if (typeof options === 'function') {
+    done = options;
+    options = {};
   }
+  if (typeof options === 'string') {
+    options = {
+      method: options
+    };
+  }
+  options = options || {};
+  options.method = options.method || 'create';
+  var method = options.method;
   var toUser = new Transform({
     objectMode: true,
     transform: function (chunk, _, next) {
@@ -168,7 +205,7 @@ function intoCartoDB(user, key, table, method, done) {
             return cb(err);
           }
           return createTemptTable(table, db).then(function (id) {
-            var nextPart = part2(db, id, table, true, toUser, cb);
+            var nextPart = part2(db, id, table, true, toUser, options, cb);
             resp.forEach(function (item) {
               nextPart.write(item);
             });
@@ -188,11 +225,11 @@ function intoCartoDB(user, key, table, method, done) {
     }
     if (method === 'append') {
       return createTemptTable(table, db).then(function (id) {
-        toUser.pipe(part2(db, id, table, false, toUser, cb));
+        toUser.pipe(part2(db, id, table, false, toUser, options, cb));
       });
     } else if (method === 'replace') {
       return createTemptTable(table, db).then(function (id) {
-        toUser.pipe(new Validator(id, db)).pipe(part2(db, id, table, true, toUser, cb));
+        toUser.pipe(new Validator(id, db)).pipe(part2(db, id, table, true, toUser, options, cb));
       });
     }
   }).catch(cb);

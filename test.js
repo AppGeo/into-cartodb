@@ -154,7 +154,10 @@ test('crud', function (t) {
         properties: {
           num: i
         },
-        geometry: null
+        geometry: {
+          type: 'Point',
+          coordinates: [i, i]
+        }
       });
     }
     stream.end();
@@ -164,5 +167,105 @@ test('crud', function (t) {
     cartodb.schema.dropTableIfExists(table).exec(function (err) {
       t.error(err, 'no error');
     });
+  });
+  t.test('test validations', function (t) {
+    t.plan(9);
+    var inserted = 0;
+    var validityError = new Error('no geometry found');
+    function validator(tempTable, fields) {
+      t.ok(true, 'validator ran');
+      if (fields.has('the_geom')) {
+        return Promise.resolve();
+      } else {
+        return Promise.reject(validityError);
+      }
+    }
+    var stream1 = intoCartodb(auth.user, auth.key, table, {
+      validations: [validator]
+    }, function (err) {
+      t.error(err, 'no error');
+      t.equals(inserted, 40);
+      cartodb(table).count('num').exec(function (err, resp) {
+        t.error(err);
+        t.deepEquals(resp, [{count: 40}]);
+        var stream2 = intoCartodb(auth.user, auth.key, table, {
+          validations: [validator],
+          method: 'replace'
+        }, function (err) {
+          t.equals(validityError, err, 'correct error');
+          cartodb(cartodb.raw('information_schema.tables')).count('table_name').where('table_name', table).exec(function (err, resp) {
+            t.error(err);
+            t.deepEquals(resp, [{count: 1}]);
+          });
+        });
+        var i = -1;
+        while (++i < 40) {
+          stream2.write({
+            type: 'Feature',
+            properties: {
+              num: i
+            },
+            geometry: null
+          });
+        }
+        stream2.end();
+      });
+    });
+    stream1.on('inserted', function (num) {
+      inserted += num;
+    });
+    var i = -1;
+    while (++i < 40) {
+      stream1.write({
+        type: 'Feature',
+        properties: {
+          num: i
+        },
+        geometry: {
+          type: 'Point',
+          coordinates: [i, i]
+        }
+      });
+    }
+    stream1.end();
+  });
+  t.test('maybe delete', function (t) {
+    t.plan(1);
+    cartodb.schema.dropTableIfExists(table).exec(function (err) {
+      t.error(err, 'no error');
+    });
+  });
+  t.test('test validation cleanup', function (t) {
+    t.plan(4);
+    var validityError = new Error('no geometry found');
+    function validator(tempTable, fields) {
+      t.ok(true, 'validator ran');
+      if (fields.has('the_geom')) {
+        return Promise.resolve();
+      } else {
+        return Promise.reject(validityError);
+      }
+    }
+    var stream1 = intoCartodb(auth.user, auth.key, table, {
+      validations: [validator]
+    }, function (err) {
+      t.equals(validityError, err, 'correct error');
+      cartodb(cartodb.raw('information_schema.tables')).count('table_name').where('table_name', table).exec(function (err, resp) {
+        t.error(err);
+        t.deepEquals(resp, [{count: 0}]);
+      });
+    });
+
+    var i = -1;
+    while (++i < 40) {
+      stream1.write({
+        type: 'Feature',
+        properties: {
+          num: i
+        },
+        geometry: null
+      });
+    }
+    stream1.end();
   });
 });
