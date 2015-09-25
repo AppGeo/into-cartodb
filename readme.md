@@ -108,4 +108,34 @@ Other options besides method which are supported include
     - a map where each entries key is the field name to be inserted into the main table and the value is the value to get it out of the temp table
     - a [cartodb-tools](https://github.com/calvinmetcalf/cartodb) database object (same api as [knex]() minus transactions)
 
-  If the promise rejects that the temporary table is cleaned up (and the stub table is cleaned up for create operations).  The field map works by the key being the name of the field to insert into the table and the value being the expressions in sql.  For instance usually the geometry value is the same as the key `the_geom` but if the geometry needs to be fixed it is instead `ST_MakeValid(the_geom) as the_geom`. 
+  See bellow for more info.
+
+
+Validations
+---
+
+If the promise rejects that the temporary table is cleaned up (and the stub table is cleaned up for create operations).  The field map works by the key being the name of the field to insert into the table and the value being the expressions in sql.  For instance usually the geometry value is the same as the key `the_geom` but if the geometry needs to be fixed it is instead `ST_MakeValid(the_geom) as the_geom`.
+
+One validation is included by default and it is used to
+
+- Transfer the geometry field over if any non null geometries
+- check if any of the geometries are invalid and run `ST_MakeValid` on them if soo, the source of that function is
+
+```js
+var fixGeom = Bluebird.coroutine(function * fixGeom(table, fields, db) {
+  var hasGeom = yield db(table).select(db.raw('bool_or(the_geom is not null) as hasgeom'));
+  hasGeom = hasGeom.length === 1 && hasGeom[0].hasgeom;
+  if (hasGeom) {
+    debug('has geometry');
+    let allValid = yield db(table).select(db.raw('bool_and(st_isvalid(the_geom)) as allvalid'));
+    allValid = allValid.length === 1 && allValid[0].allvalid;
+    if (allValid) {
+      debug('geometry is all valid');
+      fields.set('the_geom', 'the_geom');
+    } else {
+      debug('has invalid geometry');
+      fields.set('the_geom', 'ST_MakeValid(the_geom) as the_geom');
+    }
+  }
+});
+```
