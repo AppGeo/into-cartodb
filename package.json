@@ -1,6 +1,6 @@
 {
   "name": "into-cartodb",
-  "version": "1.4.2",
+  "version": "1.5.0",
   "description": "for streaming arbitrarily sized streams into cartodb",
   "main": "index.js",
   "scripts": {
