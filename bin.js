@@ -50,6 +50,11 @@ if (!user) {
   process.stdout.write('\n');
   exit += 2;
 }
+if (typeof user === 'string' && user.indexOf('@') > -1) {
+  process.stdout.write('please provide account name, you provided login email'.red);
+  process.stdout.write('\n');
+  exit += 4;
+}
 if (!exit && argv.C) {
   return uploader.cleanUpTempTables(user, key).then(function (num) {
     if (num === 0) {
