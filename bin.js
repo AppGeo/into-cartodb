@@ -27,8 +27,16 @@ var argv = toGeojson.args
   .describe('c', 'switch to create mode'.yellow)
   .alias('t', 'table')
   .describe('t', 'tablename in cartodb'.yellow)
+  .alias('v', 'version')
+  .describe('v', 'print version then exit'.yellow)
   .default('t', null, 'filename minus extention')
   .argv;
+
+if (argv.version) {
+  process.stdout.write(`v${require('./package.json').version}`.green);
+  process.stdout.write('\n');
+  process.exit(0);// eslint-disable-line no-process-exit
+}
 
 var key = argv.key;
 if (key === null) {
