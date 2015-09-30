@@ -41,6 +41,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "git@github.com:calvinmetcalf/into-cartodb.git"
+    "url": "git@github.com:appgeo/into-cartodb.git"
   }
 }
