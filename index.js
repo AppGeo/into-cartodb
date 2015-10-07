@@ -47,6 +47,11 @@ var cleanUpTempTables = Bluebird.coroutine(function * cleanUp(user, key) {
   return done;
 });
 var fixGeom = Bluebird.coroutine(function * fixGeom(tempTable, fields, db) {
+  var count = yield db(tempTable).count('*');
+  count = count.length === 1 & count[0].count;
+  if (!Number(count)) {
+    throw new Error('no rows inserted');
+  }
   var hasGeom = yield db(tempTable).select(db.raw('bool_or(the_geom is not null) as hasgeom'));
   hasGeom = hasGeom.length === 1 && hasGeom[0].hasgeom;
   if (hasGeom) {
@@ -266,7 +271,9 @@ Validator.prototype._transform = function (chunk, _, next) {
       }
       chunk.properties[key] = typed;
     });
-    self.push(chunk);
+    if (chunk.geometry || Object.keys(chunk.properties).length) {
+      self.push(chunk);
+    }
     next();
   }).catch(next);
 };
