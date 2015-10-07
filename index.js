@@ -290,6 +290,14 @@ Validator.prototype.coerceType = function (value, type) {
       }
       return out;
     case 'integer':
+      out = parseInt(value, 10);
+      if (out !== out) {
+        return this.nope;
+      }
+      if (out > 2147483647 || out < -2147483648 ) {
+        return this.nope;
+      }
+      return out;
     case 'bigint':
       out = parseInt(value, 10);
       if (out !== out) {
