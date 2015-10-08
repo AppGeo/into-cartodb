@@ -279,7 +279,7 @@ Validator.prototype._transform = function (chunk, _, next) {
 };
 
 Validator.prototype.coerceType = function (value, type) {
-  if (typeof value === 'undefined') {
+  if (typeof value === 'undefined' || value === null) {
     return this.nope;
   }
   var out;
