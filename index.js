@@ -48,7 +48,7 @@ var cleanUpTempTables = Bluebird.coroutine(function * cleanUp(user, key) {
 });
 var fixGeom = Bluebird.coroutine(function * fixGeom(tempTable, fields, db) {
   var count = yield db(tempTable).count('*');
-  count = count.length === 1 & count[0].count;
+  count = count.length === 1 && count[0].count;
   if (!Number(count)) {
     throw new Error('no rows inserted');
   }
