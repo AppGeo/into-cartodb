@@ -9,6 +9,7 @@ var uuid = require('node-uuid');
 var inherits = require('inherits');
 var debug = require('debug')('into-cartodb');
 var sanatize = require('./sanatize');
+var validate = require('./validations');
 module.exports = intoCartoDB;
 function append(db, table, toUser, cb) {
   return db.createWriteStream(table, {
@@ -46,46 +47,10 @@ var cleanUpTempTables = Bluebird.coroutine(function * cleanUp(user, key) {
   }
   return done;
 });
-var fixGeom = Bluebird.coroutine(function * fixGeom(tempTable, fields, db) {
-  var count = yield db(tempTable).count('*');
-  count = count.length === 1 && count[0].count;
-  if (!Number(count)) {
-    throw new Error('no rows inserted');
-  }
-  var hasGeom = yield db(tempTable).select(db.raw('bool_or(the_geom is not null) as hasgeom'));
-  hasGeom = hasGeom.length === 1 && hasGeom[0].hasgeom;
-  if (hasGeom) {
-    debug('has geometry');
-    let allValid = yield db(tempTable).select(db.raw('bool_and(st_isvalid(the_geom)) as allvalid'));
-    allValid = allValid.length === 1 && allValid[0].allvalid;
-    if (allValid) {
-      debug('geometry is all valid');
-      fields.set('the_geom', 'the_geom');
-    } else {
-      debug('has invalid geometry');
-      fields.set('the_geom', 'ST_MakeValid(the_geom) as the_geom');
-    }
-  }
-});
-function getValidations(config) {
-  if (!config.validations || !Array.isArray(config.validations) || !config.validations.length) {
-    return [fixGeom];
-  } else {
-    return [fixGeom].concat(config.validations);
-  }
-}
+
+
 module.exports.cleanUpTempTables = cleanUpTempTables;
-var validate = Bluebird.coroutine(function * validate(tempTable, _fields, config, db) {
-  let fields = new Map();
-  _fields.forEach(function (field) {
-    fields.set(field, field);
-  });
-  var validations = getValidations(config);
-  for (let validation of validations) {
-    yield validation(tempTable, fields, db);
-  }
-  return fields;
-});
+
 var swap = Bluebird.coroutine(function * swap(table, tempTable, remove, db, config) {
   let fields = yield db(db.raw('INFORMATION_SCHEMA.COLUMNS')).select('column_name')
   .where({
@@ -96,8 +61,9 @@ var swap = Bluebird.coroutine(function * swap(table, tempTable, remove, db, conf
     return item.column_name;
   });
   var newFields, out;
+  var group = new Set();
   try {
-    newFields = yield validate(tempTable, fields, config, db);
+    newFields = yield validate(tempTable, fields, config, db, group);
   } catch(e) {
     debug(e);
     if (config.method === 'create') {
@@ -115,10 +81,16 @@ var swap = Bluebird.coroutine(function * swap(table, tempTable, remove, db, conf
     fromFields.push(value);
     toFields.push(key);
   });
+  var groupFields = [];
+  group.forEach(function (field) {
+    groupFields.push(field);
+  });
   return db.raw(`
     BEGIN;
       ${remove ? `DELETE from ${table}` : ''};
-      INSERT into ${table} (${toFields.join(',')}) SELECT ${fromFields.join(',')} from ${tempTable};
+      INSERT into ${table} (${toFields.join(',')})
+      SELECT DISTINCT ${fromFields.join(',')} from ${tempTable}
+      ${groupFields.length ? `group by ${groupFields.join(',')}` : ''};
       DROP TABLE ${tempTable};
     COMMIT;
   `);
