@@ -10,6 +10,7 @@ var inherits = require('inherits');
 var debug = require('debug')('into-cartodb');
 var sanatize = require('./sanatize');
 var validate = require('./validations');
+var escape = require('pg-escape');
 module.exports = intoCartoDB;
 function append(db, table, toUser, cb) {
   return db.createWriteStream(table, {
@@ -24,9 +25,9 @@ function append(db, table, toUser, cb) {
 
 var createTemptTable = Bluebird.coroutine(function * createTemptTable(table, db){
   var id = `${table.slice(0, 21)}_temp_${uuid().replace(/-/g, '_')}`;
-  yield db.raw(`
-      create table ${id} as table "${table}" with no data;
-  `);
+  yield db.raw(escape(`
+      create table %I as table %I with no data;
+  `, id, table));
   return id;
 });
 var cleanUpTempTables = Bluebird.coroutine(function * cleanUp(user, key) {
@@ -67,9 +68,9 @@ var swap = Bluebird.coroutine(function * swap(table, tempTable, remove, db, conf
   } catch(e) {
     debug(e);
     if (config.method === 'create') {
-      out = db.raw(`DROP TABLE ${table}, ${tempTable};`);
+      out = db.raw(escape(`DROP TABLE %I, %I;`, table, tempTable));
     } else {
-      out = db.raw(`DROP TABLE ${tempTable};`);
+      out = db.raw(escape(`DROP TABLE %I;`, tempTable));
     }
     return out.then(function () {
       return Promise.reject(e || new Error('validation failed'));
@@ -85,15 +86,15 @@ var swap = Bluebird.coroutine(function * swap(table, tempTable, remove, db, conf
   group.forEach(function (field) {
     groupFields.push(field);
   });
-  return db.raw(`
+  return db.raw(escape(`
     BEGIN;
-      ${remove ? `DELETE from "${table}"` : ''};
-      INSERT into "${table}" (${toFields.join(',')})
-      SELECT DISTINCT ${fromFields.join(',')} from ${tempTable}
+      ${remove ? escape(`DELETE from %I`, table) : ''};
+      INSERT into %I (${toFields.join(',')})
+      SELECT DISTINCT ${fromFields.join(',')} from %I
       ${groupFields.length ? `group by ${groupFields.join(',')}` : ''};
-      DROP TABLE ${tempTable};
+      DROP TABLE %I;
     COMMIT;
-  `);
+  `, table, tempTable, tempTable));
 });
 
 /*
@@ -177,9 +178,12 @@ function intoCartoDB(user, key, table, options, done) {
         var uploadStream = uploader.geojson({
           user: user,
           key: key
-        }, table, function (err) {
+        }, table, function (err, r) {
           if (err) {
             return cb(err);
+          }
+          if (r.table_name !== table) {
+            return cb(new Error('table not created successfully'));
           }
           return createTemptTable(table, db).then(function (id) {
             var nextPart = part2(db, id, table, true, toUser, options, cb);

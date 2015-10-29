@@ -223,7 +223,7 @@ var subs = [
 function sanatize(str) {
   var out = subs.reduce(function (str, rpl) {
     return str.replace(rpl[0], rpl[1]);
-  }, str).toLowerCase().replace(/&.+?;/g, ' ').replace(/[^a-z0-9_-]/g, ' ').replace(/\s+/g, ' ').trim().replace(/\s/g, '_');
+  }, str).toLowerCase().replace(/&.+?;/g, ' ').replace(/[^a-z0-9_]/g, ' ').replace(/\s+/g, ' ').trim().replace(/\s/g, '_');
   if (out.match(/^[^a-z_]/) || reserved.has(out)) {
     out = '_' + out;
   }

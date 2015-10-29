@@ -7,6 +7,7 @@ var crypto = require('crypto');
 test('crud', function (t) {
   var table = 'test_table_into_carto' + crypto.randomBytes(8).toString('hex');
   var tablewithDash = 'test-table_into_carto' + crypto.randomBytes(8).toString('hex');
+  var tablewithOutDash = tablewithDash.replace(/-/g, '_');
   t.test('maybe delete', function (t) {
     t.plan(1);
     cartodb.schema.dropTableIfExists(table).exec(function (err) {
@@ -346,9 +347,9 @@ test('crud', function (t) {
     }
     stream1.end();
   });
-  t.test('maybe delete', function (t) {
+  t.test('maybe delete with dash', function (t) {
     t.plan(1);
-    cartodb.schema.dropTableIfExists(tablewithDash).exec(function (err) {
+    cartodb.schema.dropTableIfExists(tablewithOutDash).exec(function (err) {
       t.error(err, 'no error');
     });
   });
@@ -357,9 +358,9 @@ test('crud', function (t) {
     var stream = intoCartodb(auth.user, auth.key, tablewithDash, function (err) {
       t.error(err, 'no error');
       t.equals(inserted, 160);
-      cartodb(tablewithDash).select().where('foo_blahoela', 'foo_blahoela').where('_as', '_as').where('fooo', 'fooo').exec(function (err, resp) {
+      cartodb(tablewithOutDash).select().where('foo_blahoela', 'foo_blahoela').where('_as', '_as').where('fooo', 'fooo').where('dash_dash', 'dash-dash').exec(function (err, resp) {
         t.error(err, 'no error');
-        t.equals(resp.length, 160);
+        t.equals(resp && resp.length, 160);
         t.end();
       });
     });
@@ -376,16 +377,17 @@ test('crud', function (t) {
           1: 1,
           'foo.blahœla': 'foo_blahoela',
           '<foo>as': '_as',
-          '?#fooo': 'fooo'
+          '?#fooo': 'fooo',
+          'dash-dash': 'dash-dash'
           },
         geometry: null
       });
     }
     stream.end();
   });
-  t.test('maybe delete', function (t) {
+  t.test('maybe delete with dash', function (t) {
     t.plan(1);
-    cartodb.schema.dropTableIfExists(tablewithDash).exec(function (err) {
+    cartodb.schema.dropTableIfExists(tablewithOutDash).exec(function (err) {
       t.error(err, 'no error');
     });
   });

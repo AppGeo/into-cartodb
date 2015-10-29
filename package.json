@@ -32,6 +32,7 @@
     "jsonstream3": "^3.0.0",
     "node-uuid": "^1.4.3",
     "once": "^1.3.2",
+    "pg-escape": "^0.1.0",
     "readable-stream": "^2.0.2",
     "to-geojson-stream": "^1.0.0"
   },
