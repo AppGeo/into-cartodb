@@ -153,6 +153,9 @@ function intoCartoDB(user, key, table, options, done) {
       next();
     }
   });
+  function warning(msg) {
+    toUser.emit('warning', msg);
+  }
   var cb = once(function (err, resp) {
     if (err) {
       if (done) {
@@ -190,7 +193,7 @@ function intoCartoDB(user, key, table, options, done) {
             resp.forEach(function (item) {
               nextPart.write(item);
             });
-            out.pipe(nextPart);
+            out.pipe(new Validator(id, db, warning)).pipe(nextPart);
           });
         });
         resp.forEach(function (item) {
@@ -206,21 +209,23 @@ function intoCartoDB(user, key, table, options, done) {
     }
     if (method === 'append') {
       return createTemptTable(table, db).then(function (id) {
-        toUser.pipe(part2(db, id, table, false, toUser, options, cb));
+        toUser.pipe(new Validator(id, db, warning)).pipe(part2(db, id, table, false, toUser, options, cb));
       });
     } else if (method === 'replace') {
       return createTemptTable(table, db).then(function (id) {
-        toUser.pipe(new Validator(id, db)).pipe(part2(db, id, table, true, toUser, options, cb));
+        toUser.pipe(new Validator(id, db, warning)).pipe(part2(db, id, table, true, toUser, options, cb));
       });
     }
   }).catch(cb);
   return toUser;
 }
 inherits(Validator, Transform);
-function Validator(id, db) {
+function Validator(id, db, warning) {
   Transform.call(this, {
     objectMode: true
   });
+  this.warning = warning;
+  this.extraKeys = new Set();
   this.schema = db(db.raw('INFORMATION_SCHEMA.COLUMNS')).select('column_name', 'data_type')
   .where('table_name', id )
   .whereNotIn('column_name', ['cartodb_id', 'the_geom_webmercator', 'created_at', 'updated_at', 'the_geom']).then(function (data) {
@@ -232,6 +237,13 @@ function Validator(id, db) {
   });
   this.nope = Symbol('nope');
 }
+Validator.prototype.keyWarning = function (key) {
+  if (this.extraKeys.has(key)) {
+    return;
+  }
+  this.extraKeys.add(key);
+  this.warning(`An unexpected field "${key}" was encountered. This field was not uploaded`);
+};
 Validator.prototype._transform = function (chunk, _, next) {
   var self = this;
   var props = chunk.properties;
@@ -239,6 +251,7 @@ Validator.prototype._transform = function (chunk, _, next) {
   this.schema.then(function (schema) {
     Object.keys(props).forEach(function (key) {
       if (!schema.has(key)) {
+        self.keyWarning(key);
         return;
       }
       var typed = self.coerceType(props[key], schema.get(key));

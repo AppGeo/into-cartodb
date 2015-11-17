@@ -391,4 +391,78 @@ test('crud', function (t) {
       t.error(err, 'no error');
     });
   });
+  t.test('maybe delete', function (t) {
+    t.plan(1);
+    cartodb.schema.dropTableIfExists(table).exec(function (err) {
+      t.error(err, 'no error');
+    });
+  });
+  t.test('extra field throws a warning', function (t) {
+    t.plan(6);
+    var stream1 = intoCartodb(auth.user, auth.key, table, function (err) {
+      t.error(err, 'no error for stream 1');
+      var inserted = 0;
+      var stream2 = intoCartodb(auth.user, auth.key, table, 'append', function (err) {
+        t.error(err, 'no error for stream 2');
+        t.equals(inserted, 4, 'inserted correct ammount');
+      }).on('inserted', function (n) {
+        inserted += n;
+      }).on('warning', function (field) {
+        t.ok(true, field);
+      });
+      stream2.write({
+        type: 'Feature',
+        properties: {
+          field1: 'foo',
+          field2: 'bar'
+        },
+        geometry: null
+      });
+      stream2.write({
+        type: 'Feature',
+        properties: {
+          field1: 'foo',
+          field2: 'bar',
+          field3: 'baz'
+        },
+        geometry: null
+      });
+      stream2.write({
+        type: 'Feature',
+        properties: {
+          field1: 'foo',
+          field2: 'bar',
+          field3: 'baz',
+          field4: 'bat'
+        },
+        geometry: null
+      });
+      stream2.write({
+        type: 'Feature',
+        properties: {
+          field1: 'foo',
+          field2: 'bar',
+          field3: 'baz',
+          field4: 'bat',
+          field5: 'bag'
+        },
+        geometry: null
+      });
+      stream2.end();
+    });
+    stream1.end({
+      type: 'Feature',
+      properties: {
+        field1: 'foo',
+        field2: 'bar'
+      },
+      geometry: null
+    });
+  });
+  t.test('maybe delete', function (t) {
+    t.plan(1);
+    cartodb.schema.dropTableIfExists(table).exec(function (err) {
+      t.error(err, 'no error');
+    });
+  });
 });
