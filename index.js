@@ -12,9 +12,9 @@ var sanatize = require('./sanatize');
 var validate = require('./validations');
 var escape = require('pg-escape');
 module.exports = intoCartoDB;
-function append(db, table, toUser, cb) {
+function append(db, table, toUser, options, cb) {
   return db.createWriteStream(table, {
-    batchSize: 50
+    batchSize: options.batchSize
   })
     .once('error', cb)
     .once('uploaded', cb)
@@ -114,7 +114,7 @@ function exists(name, db) {
   });
 }
 function part2(db, table, origTable, remove, toUser, config, done) {
-  return append(db, table, toUser, function (err) {
+  return append(db, table, toUser, config, function (err) {
      if (err) {
        return done(err);
      }
@@ -140,6 +140,7 @@ function intoCartoDB(user, key, table, options, done) {
   }
   options = options || {};
   options.method = options.method || 'create';
+  options.batchSize = options.batchSize || 200;
   var method = options.method;
   var toUser = new Transform({
     objectMode: true,
@@ -174,7 +175,7 @@ function intoCartoDB(user, key, table, options, done) {
       if (count !== 0) {
         throw new Error('table already exists');
       }
-      let out = new FirstN(100, function (err, resp) {
+      let out = new FirstN(options.batchSize, function (err, resp) {
         if (err) {
           return cb(err);
         }
