@@ -15,7 +15,7 @@ npm install into-cartodb -g
 at it's simplest you can just point it to a file with the `-f` option and it will upload it to the table in cartodb that is the same as the file name minus the extension.
 
 ```bash
-into-cartodb -k API_KEY -u USER_NAME -f path/to/file.ext
+into-cartodb -k API_KEY -u USER_NAME -f path/to/file.ext -b 200
 ```
 
 If you set the CARTODB_USER_NAME and CARTODB_API_KEY environmental variables you may omit the `-k` and `-u` options.
@@ -66,6 +66,8 @@ into-cartodb -f path/to/file.ext -c
 
 Create mode throws an error if the table already exists in cartodb, replace and append modes throw an error if the table does not exist yet.
 
+By default data is pushed into cartodb in batches of 200, you may use the `-b` argument to decrease the batch size if you are running out of memory or increase it if the upload is taking too long.
+
 Supported formats are
 
 - .geojson
@@ -107,6 +109,7 @@ Other options besides method which are supported include
     - the name of the table in cartodb
     - a map where each entries key is the field name to be inserted into the main table and the value is the value to get it out of the temp table
     - a [cartodb-tools](https://github.com/calvinmetcalf/cartodb) database object (same api as [knex]() minus transactions)
+- batchSize: number of features to insert into cartodb at a time, defaults to 200, decrease if you are running out of memory.
 
   See bellow for more info.
 

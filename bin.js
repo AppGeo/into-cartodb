@@ -27,9 +27,12 @@ var argv = toGeojson.args
   .describe('c', 'switch to create mode'.yellow)
   .alias('t', 'table')
   .describe('t', 'tablename in cartodb'.yellow)
+  .default('t', null, 'filename minus extention')
   .alias('v', 'version')
   .describe('v', 'print version then exit'.yellow)
-  .default('t', null, 'filename minus extention')
+  .alias('b', 'batchsize')
+  .describe('b', 'set the batch size'.yellow)
+  .default('b', 200)
   .argv;
 
 if (argv.version) {
@@ -95,7 +98,10 @@ function getMethod() {
 var total = 0;
 toGeojson.filename.then(function (filename) {
   var tablename = argv.t || path.basename(filename, path.extname(filename));
-  toGeojson.stream().pipe(uploader(user, key, tablename, getMethod(), function (err) {
+  toGeojson.stream().pipe(uploader(user, key, tablename, {
+    method: getMethod(),
+    batchSize: parseInt(argv.b, 10)
+  }, function (err) {
     if (err) {
       process.stdout.write((err.stack || err.toString()).red);
       process.stdout.write('\n');
