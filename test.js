@@ -11,6 +11,7 @@ test('crud', function (t) {
   t.test('maybe delete', function (t) {
     t.plan(1);
     cartodb.schema.dropTableIfExists(table).exec(function (err) {
+      table = 'test_table_into_carto' + crypto.randomBytes(8).toString('hex');
       t.error(err, 'no error');
     });
   });
@@ -132,6 +133,7 @@ test('crud', function (t) {
   t.test('maybe delete again', function (t) {
     t.plan(1);
     cartodb.schema.dropTableIfExists(table).exec(function (err) {
+      table = 'test_table_into_carto' + crypto.randomBytes(8).toString('hex');
       t.error(err, 'no error');
     });
   });
@@ -167,6 +169,7 @@ test('crud', function (t) {
   t.test('maybe delete', function (t) {
     t.plan(1);
     cartodb.schema.dropTableIfExists(table).exec(function (err) {
+      table = 'test_table_into_carto' + crypto.randomBytes(8).toString('hex');
       t.error(err, 'no error');
     });
   });
@@ -234,6 +237,7 @@ test('crud', function (t) {
   t.test('maybe delete', function (t) {
     t.plan(1);
     cartodb.schema.dropTableIfExists(table).exec(function (err) {
+      table = 'test_table_into_carto' + crypto.randomBytes(8).toString('hex');
       t.error(err, 'no error');
     });
   });
@@ -273,6 +277,7 @@ test('crud', function (t) {
   t.test('maybe delete', function (t) {
     t.plan(1);
     cartodb.schema.dropTableIfExists(table).exec(function (err) {
+      table = 'test_table_into_carto' + crypto.randomBytes(8).toString('hex');
       t.error(err, 'no error');
     });
   });
@@ -319,6 +324,7 @@ test('crud', function (t) {
   t.test('maybe delete', function (t) {
     t.plan(1);
     cartodb.schema.dropTableIfExists(table).exec(function (err) {
+      table = 'test_table_into_carto' + crypto.randomBytes(8).toString('hex');
       t.error(err, 'no error');
     });
   });
@@ -350,6 +356,7 @@ test('crud', function (t) {
   t.test('maybe delete with dash', function (t) {
     t.plan(1);
     cartodb.schema.dropTableIfExists(tablewithOutDash).exec(function (err) {
+      table = 'test_table_into_carto' + crypto.randomBytes(8).toString('hex');
       t.error(err, 'no error');
     });
   });
@@ -394,6 +401,7 @@ test('crud', function (t) {
   t.test('maybe delete', function (t) {
     t.plan(1);
     cartodb.schema.dropTableIfExists(table).exec(function (err) {
+      table = 'test_table_into_carto' + crypto.randomBytes(8).toString('hex');
       t.error(err, 'no error');
     });
   });
@@ -462,6 +470,7 @@ test('crud', function (t) {
   t.test('maybe delete', function (t) {
     t.plan(1);
     cartodb.schema.dropTableIfExists(table).exec(function (err) {
+      table = 'test_table_into_carto' + crypto.randomBytes(8).toString('hex');
       t.error(err, 'no error');
     });
   });

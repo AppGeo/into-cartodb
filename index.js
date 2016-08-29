@@ -25,9 +25,7 @@ function append(db, table, toUser, options, cb) {
 
 var createTemptTable = Bluebird.coroutine(function * createTemptTable(table, db){
   var id = `${table.slice(0, 21)}_temp_${uuid().replace(/-/g, '_')}`;
-  yield db.raw(escape(`
-      create table %I as table %I with no data;
-  `, id, table));
+  yield db.raw('create table ?? as table ?? with no data;', [id, table]);
   return id;
 });
 var cleanUpTempTables = Bluebird.coroutine(function * cleanUp(user, key) {
@@ -86,15 +84,12 @@ var swap = Bluebird.coroutine(function * swap(table, tempTable, remove, db, conf
   group.forEach(function (field) {
     groupFields.push(field);
   });
-  return db.raw(escape(`
-    BEGIN;
-      ${remove ? escape(`DELETE from %I`, table) : ''};
-      INSERT into %I (${toFields.join(',')})
-      SELECT DISTINCT ${fromFields.join(',')} from %I
+  return db.raw(`
+      ${remove ? escape('DELETE from %I', table) : ''};
+      INSERT into ?? (${toFields.join(',')})
+      SELECT DISTINCT ${fromFields.join(',')} from ??
       ${groupFields.length ? `group by ${groupFields.join(',')}` : ''};
-      DROP TABLE %I;
-    COMMIT;
-  `, table, tempTable, tempTable));
+  `,[table, tempTable]).batch().onSuccess(db.raw('DROP TABLE ??;', [tempTable])).onError(db.raw('DROP TABLE ??;', [tempTable]));
 });
 
 /*
