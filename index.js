@@ -262,7 +262,8 @@ Validator.prototype._transform = function (chunk, _, next) {
     next();
   }).catch(next);
 };
-
+const falses = new Set(['f','false','n','no','off','0']);
+const trues = new Set(['t','true','y','yes','on','1']);
 Validator.prototype.coerceType = function (value, type) {
   if (typeof value === 'undefined' || value === null) {
     return this.nope;
@@ -306,7 +307,16 @@ Validator.prototype.coerceType = function (value, type) {
       if (value === 'NULL') {
         return this.nope;
       }
-      return Boolean(value);
+      if (typeof value !== 'string') {
+        return Boolean(value);
+      }
+      if (falses.has(value.trim().toLowerCase())) {
+        return false;
+      }
+      if (trues.has(value.trim().toLowerCase())) {
+        return true;
+      }
+      return this.nope;
     default:
       return this.nope;
   }
