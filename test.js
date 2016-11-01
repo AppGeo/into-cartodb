@@ -51,7 +51,8 @@ test('crud', function (t) {
           1: 1,
           'foo.blahœla': 'foo_blahoela',
           '<foo>as': '_as',
-          '?#fooo': 'fooo'
+          '?#fooo': 'fooo',
+          bar: true
           },
         geometry: null
       });
@@ -164,6 +165,75 @@ test('crud', function (t) {
         }
       });
     }
+    stream.end();
+  });
+  t.test('maybe delete again', function (t) {
+    t.plan(1);
+    cartodb.schema.dropTableIfExists(table).exec(function (err) {
+      table = 'test_table_into_carto' + crypto.randomBytes(8).toString('hex');
+      t.error(err, 'no error');
+    });
+  });
+  t.test('booleans', function (t) {
+    t.plan(2);
+    var stream = intoCartodb(auth.user, auth.key, table, {batchSize: 50}, function (err) {
+      cartodb(table).count('b').where({
+        b: true
+      }).exec(function (err, data) {
+        t.error(err);
+        t.equals(data[0].count, 3);
+      });
+    });
+    var i = -1;
+    while (++i < 210) {
+      stream.write({
+        type: 'Feature',
+        properties: {
+          num: i,
+          b: false
+        },
+        geometry: {
+          type: 'Point',
+          coordinates: [i, i]
+        }
+      });
+    }
+    i++;
+    stream.write({
+      type: 'Feature',
+      properties: {
+        num: i,
+        b: true
+      },
+      geometry: null
+    });
+    i++;
+    stream.write({
+      type: 'Feature',
+      properties: {
+        num: i,
+        b: false
+      },
+      geometry: null
+    });
+    i++;
+    stream.write({
+      type: 'Feature',
+      properties: {
+        num: i,
+        b: 'on'
+      },
+      geometry: null
+    });
+    i++;
+    stream.write({
+      type: 'Feature',
+      properties: {
+        num: i,
+        b: 'true'
+      },
+      geometry: null
+    });
     stream.end();
   });
   t.test('maybe delete', function (t) {
