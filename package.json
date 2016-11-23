@@ -30,11 +30,11 @@
     "first-n-stream": "^2.0.0",
     "inherits": "^2.0.1",
     "jsonstream3": "^3.0.0",
-    "node-uuid": "^1.4.3",
     "once": "^1.3.2",
     "pg-escape": "^0.1.0",
     "readable-stream": "^2.0.2",
-    "to-geojson-stream": "^1.0.1"
+    "to-geojson-stream": "^1.0.1",
+    "uuid": "^3.0.0"
   },
   "devDependencies": {
     "tap-nyan": "0.0.2",
