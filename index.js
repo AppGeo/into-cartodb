@@ -123,7 +123,14 @@ function part2(db, table, origTable, remove, toUser, config, done) {
 }
 
 function intoCartoDB(user, key, table, options, done) {
-  table = sanatize(table).slice(0, 63);
+
+  table = sanatize(table);
+  if (table.match(/^[^a-z_]/)) {
+    table = 'table_' + table
+  } else if (table[0] === '_') {
+    table = 'table' + table;
+  }
+  table = table.slice(0, 63);
   if (typeof options === 'function') {
     done = options;
     options = {};
@@ -270,6 +277,7 @@ Validator.prototype.coerceType = function (value, type) {
   }
   var out;
   switch(type) {
+    case 'character':
     case 'text':
       out = String(value);
       if (!out) {

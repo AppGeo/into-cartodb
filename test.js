@@ -540,7 +540,85 @@ test('crud', function (t) {
   t.test('maybe delete', function (t) {
     t.plan(1);
     cartodb.schema.dropTableIfExists(table).exec(function (err) {
-      table = 'test_table_into_carto' + crypto.randomBytes(8).toString('hex');
+      table = '9test_table_into_carto' + crypto.randomBytes(8).toString('hex');
+      t.error(err, 'no error');
+    });
+  });
+  t.test('leading number', function (t) {
+    var inserted = 0;
+    var stream = intoCartodb(auth.user, auth.key, table, function (err) {
+      t.error(err, 'no error');
+      t.equals(inserted, 160);
+      cartodb('table_' + table).select().where('foo_blahoela', 'foo_blahoela').where('_as', '_as').where('fooo', 'fooo').exec(function (err, resp) {
+        t.error(err, 'no error');
+        t.equals(resp.length, 160);
+        t.end();
+      });
+    });
+    stream.on('inserted', function (num) {
+      t.ok(true, 'inserted');
+      inserted += num;
+    });
+    var i = -1;
+    while (++i < 160) {
+      stream.write({
+        type: 'Feature',
+        properties: {
+          num: i,
+          1: 1,
+          'foo.blahœla': 'foo_blahoela',
+          '<foo>as': '_as',
+          '?#fooo': 'fooo',
+          bar: true
+          },
+        geometry: null
+      });
+    }
+    stream.end();
+  });
+  t.test('maybe delete', function (t) {
+    t.plan(1);
+    cartodb.schema.dropTableIfExists('table_' + table).exec(function (err) {
+      table = '_test_table_into_carto' + crypto.randomBytes(8).toString('hex');
+      t.error(err, 'no error');
+    });
+  });
+  t.test('leading underscore', function (t) {
+    var inserted = 0;
+    var stream = intoCartodb(auth.user, auth.key, table, function (err) {
+      t.error(err, 'no error');
+      t.equals(inserted, 160);
+      cartodb('table' + table).select().where('foo_blahoela', 'foo_blahoela').where('_as', '_as').where('fooo', 'fooo').exec(function (err, resp) {
+        t.error(err, 'no error');
+        t.equals(resp.length, 160);
+        t.end();
+      });
+    });
+    stream.on('inserted', function (num) {
+      t.ok(true, 'inserted');
+      inserted += num;
+    });
+    var i = -1;
+    while (++i < 160) {
+      stream.write({
+        type: 'Feature',
+        properties: {
+          num: i,
+          1: 1,
+          'foo.blahœla': 'foo_blahoela',
+          '<foo>as': '_as',
+          '?#fooo': 'fooo',
+          bar: true
+          },
+        geometry: null
+      });
+    }
+    stream.end();
+  });
+  t.test('maybe delete', function (t) {
+    t.plan(1);
+    cartodb.schema.dropTableIfExists('table' + table).exec(function (err) {
+      table = '_test_table_into_carto' + crypto.randomBytes(8).toString('hex');
       t.error(err, 'no error');
     });
   });
