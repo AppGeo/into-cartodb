@@ -33,6 +33,8 @@ var argv = toGeojson.args
   .alias('b', 'batchsize')
   .describe('b', 'set the batch size'.yellow)
   .default('b', 200)
+  .alias('d', 'direct')
+  .describe('d', 'upload directly to the table (create/append only)'.yellow)
   .argv;
 
 if (argv.version) {
@@ -100,13 +102,15 @@ toGeojson.filename.then(function (filename) {
   var tablename = argv.t || path.basename(filename, path.extname(filename));
   toGeojson.stream().pipe(uploader(user, key, tablename, {
     method: getMethod(),
-    batchSize: parseInt(argv.b, 10)
+    batchSize: parseInt(argv.b, 10),
+    direct: argv.d
   }, function (err) {
     if (err) {
       process.stdout.write((err.stack || err.toString()).red);
       process.stdout.write('\n');
       process.exit(8);// eslint-disable-line no-process-exit
     }
+    updateCli();
     process.stdout.write('\ndone'.green);
     process.stdout.write('\n');
     process.exit(0);// eslint-disable-line no-process-exit

@@ -68,6 +68,8 @@ Create mode throws an error if the table already exists in cartodb, replace and 
 
 By default data is pushed into cartodb in batches of 200, you may use the `-b` argument to decrease the batch size if you are running out of memory or increase it if the upload is taking too long.
 
+By default we stream to a temp table and then move it over after we're done, if you don't want that for whatever reason (i.e. really big data) then pass the `-d` option for a direct import, only works with create and append.
+
 Supported formats are
 
 - .geojson
