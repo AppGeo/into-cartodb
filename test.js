@@ -4,6 +4,7 @@ var intoCartodb = require('./');
 var auth = require('./auth.json');
 var cartodb = require('cartodb-tools')(auth.user, auth.key);
 var crypto = require('crypto');
+var badGeom = require('./badgeom.json');
 test('crud', function (t) {
   var table = 'test_table_into_carto' + crypto.randomBytes(8).toString('hex');
   var tablewithDash = 'test-table_into_carto' + crypto.randomBytes(8).toString('hex');
@@ -233,6 +234,46 @@ test('crud', function (t) {
         b: 'true'
       },
       geometry: null
+    });
+    stream.end();
+  });
+  t.test('maybe delete again', function (t) {
+    t.plan(1);
+    cartodb.schema.dropTableIfExists(table).exec(function (err) {
+      table = 'test_table_into_carto' + crypto.randomBytes(8).toString('hex');
+      t.error(err, 'no error');
+    });
+  });
+  t.test('geometry weirdness', function (t) {
+    t.plan(5);
+    var stream = intoCartodb(auth.user, auth.key, table, function (err) {
+      t.error(err);
+      cartodb(table).count('num').whereRaw('GeometryType(the_geom) = \'GEOMETRYCOLLECTION\'').exec(function (err, resp) {
+        t.error(err);
+        t.deepEquals(resp, [{count: 0}]);
+      });
+      cartodb(table).count('num').exec(function (err, resp) {
+        t.error(err);
+        t.deepEquals(resp, [{count: 1}]);
+      });
+    });
+
+    stream.write({
+      type: 'Feature',
+      properties: {
+        num: 1
+      },
+      geometry: badGeom
+    });
+    stream.write({
+      type: 'Feature',
+      properties: {
+        num: 2
+      },
+      geometry: {
+        type: 'Point',
+        coordinates: [2, 3]
+      }
     });
     stream.end();
   });
