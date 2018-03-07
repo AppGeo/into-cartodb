@@ -87,7 +87,7 @@ var swap = Bluebird.coroutine(function * swap(table, tempTable, remove, db, conf
   return db.raw(`
       ${remove ? escape('DELETE from %I', table) : ''};
       INSERT into ?? (${toFields.join(',')})
-      SELECT DISTINCT ${fromFields.join(',')} from ??
+      SELECT ${fromFields.join(',')} from ??
       ${groupFields.length ? `group by ${groupFields.join(',')}` : ''};
   `,[table, tempTable]).batch().onSuccess(db.raw('DROP TABLE ??;', [tempTable])).onError(db.raw('DROP TABLE ??;', [tempTable]));
 });

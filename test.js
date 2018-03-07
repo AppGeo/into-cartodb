@@ -439,31 +439,7 @@ test('crud', function (t) {
       t.error(err, 'no error');
     });
   });
-  t.test('test dedupping', function (t) {
-    t.plan(3);
-    var stream1 = intoCartodb(auth.user, auth.key, table, function (err) {
-      t.error(err);
-      cartodb(table).count('*').exec(function (err, resp) {
-        t.error(err);
-        t.deepEquals(resp, [{count: 3}]);
-      });
-    });
 
-    var i = -1;
-    while (++i < 100) {
-      stream1.write({
-        type: 'Feature',
-        properties: {
-          num: i % 3
-        },
-        geometry: {
-          type: 'Point',
-          coordinates: [i % 3, i % 3]
-        }
-      });
-    }
-    stream1.end();
-  });
   t.test('maybe delete with dash', function (t) {
     t.plan(1);
     cartodb.schema.dropTableIfExists(tablewithOutDash).exec(function (err) {
