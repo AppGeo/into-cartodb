@@ -4,7 +4,7 @@
   "description": "for streaming arbitrarily sized streams into cartodb",
   "main": "index.js",
   "scripts": {
-    "test": "node test.js | tnyan"
+    "test": "node test.js"
   },
   "bin": {
     "in2cartodb": "./bin.js",
@@ -22,6 +22,7 @@
   "license": "MIT",
   "dependencies": {
     "bluebird": "^2.10.0",
+    "carto-copy-stream": "^0.1.2",
     "cartodb-tools": "^2.4.0",
     "cartodb-uploader": "^2.0.1",
     "colors": "^1.1.2",
