@@ -10,17 +10,18 @@ var inherits = require('inherits');
 var debug = require('debug')('into-cartodb');
 var sanatize = require('./sanatize');
 var validate = require('./validations');
+var cartoCopyStream = require('carto-copy-stream');
+
 var escape = require('pg-escape');
 module.exports = intoCartoDB;
 function append(db, table, toUser, options, cb) {
-  return db.createWriteStream(table, {
-    batchSize: options.batchSize
-  })
-    .once('error', cb)
-    .once('uploaded', cb)
-    .on('inserted', function (num) {
-      toUser.emit('inserted', num);
-    });
+  return cartoCopyStream(options.user, options.key, table, options.fields, function (err, resp) {
+    if (err) {
+      return cb(err);
+    }
+    toUser.emit('inserted', resp.total_rows);
+    cb();
+  });
 }
 
 var createTemptTable = Bluebird.coroutine(function * createTemptTable(table, db){
@@ -51,15 +52,8 @@ var cleanUpTempTables = Bluebird.coroutine(function * cleanUp(user, key) {
 module.exports.cleanUpTempTables = cleanUpTempTables;
 
 var swap = Bluebird.coroutine(function * swap(table, tempTable, remove, db, config) {
-  let fields = yield db(db.raw('INFORMATION_SCHEMA.COLUMNS')).select('column_name')
-  .where({
-    table_name: tempTable // eslint-disable-line camelcase
-  })
-  .whereNotIn('column_name', ['cartodb_id', 'the_geom_webmercator', 'created_at', 'updated_at', 'the_geom']);
-  fields = fields.map(function (item) {
-    return item.column_name;
-  });
   var newFields, out;
+  const fields = config.fields;
   var group = new Set();
   try {
     newFields = yield validate(tempTable, fields, config, db, group);
@@ -97,7 +91,7 @@ var swap = Bluebird.coroutine(function * swap(table, tempTable, remove, db, conf
   style: create|replace|append
 }
 */
-function exists(name, db) {
+function _exists(name, db) {
   return db(db.raw('information_schema.tables')).count('table_name').where('table_name', name).then(function (resp) {
     if (resp.length !== 1) {
       throw new Error('invalid response');
@@ -108,6 +102,25 @@ function exists(name, db) {
     return resp[0].count;
   });
 }
+
+var getFields = Bluebird.coroutine(function * (db, tempTable) {
+  let fields = yield db(db.raw('INFORMATION_SCHEMA.COLUMNS')).select('column_name')
+  .where({
+    table_name: tempTable // eslint-disable-line camelcase
+  })
+  .whereNotIn('column_name', ['cartodb_id', 'the_geom_webmercator', 'created_at', 'updated_at', 'the_geom']);
+  return fields.map(function (item) {
+    return item.column_name;
+  });
+})
+const exists = Bluebird.coroutine(function * (name, db) {
+  let count = yield _exists(name, db);
+  if (count === 0) {
+    return {count};
+  }
+  let fields = yield getFields(db, name);
+  return {count, fields};
+})
 function part2(db, table, origTable, remove, toUser, config, done) {
   return append(db, table, toUser, config, function (err) {
     if (err) {
@@ -141,6 +154,7 @@ function intoCartoDB(user, key, table, options, done) {
     };
   }
   options = options || {};
+  options = Object.assign({user, key}, options)
   options.method = options.method || 'create';
   options.batchSize = options.batchSize || 200;
   var direct = options.direct;
@@ -173,7 +187,8 @@ function intoCartoDB(user, key, table, options, done) {
     toUser.emit('uploaded');
   });
   var db = cartodb(user, key);
-  exists(table, db).then(function (count) {
+  exists(table, db).then(function (res) {
+    let count = res.count;
     if (method === 'create') {
       if (count !== 0) {
         throw new Error('table already exists');
@@ -185,26 +200,30 @@ function intoCartoDB(user, key, table, options, done) {
         var uploadStream = uploader.geojson({
           user: user,
           key: key
-        }, table, function (err, r) {
+        }, table, Bluebird.coroutine(function * (err, r) {
           if (err) {
             return cb(err);
           }
           if (r.table_name !== table) {
             return cb(new Error(`exptexted "${table}" but got "${r.table_name}"`));
           }
-          if (direct) {
-            var nextPart = part2(db, table, false, true, toUser, options, cb);
-            return out.pipe(new Validator(table, db, warning)).pipe(nextPart);
-          } else {
-            return createTemptTable(table, db).then(function (id) {
+          try {
+            options.fields = yield getFields(db, table)
+            if (direct) {
+              var nextPart = part2(db, table, false, true, toUser, options, cb);
+              return out.pipe(new Validator(table, db, warning)).pipe(nextPart);
+            } else {
+              const id = yield createTemptTable(table, db)
               var nextPart = part2(db, id, table, true, toUser, options, cb);
               resp.forEach(function (item) {
                 nextPart.write(item);
               });
               out.pipe(new Validator(id, db, warning)).pipe(nextPart);
-            });
+            }
+          } catch (e) {
+            cb(e);
           }
-        });
+        }));
         resp.forEach(function (item) {
           uploadStream.write(item);
         });
@@ -216,6 +235,7 @@ function intoCartoDB(user, key, table, options, done) {
     if (count !== 1) {
       throw new Error('table must exist');
     }
+    options.fields = res.fields;
     if (method === 'append') {
       if (direct) {
         return toUser.pipe(new Validator(table, db, warning)).pipe(part2(db, table, false, false, toUser, options, cb));
