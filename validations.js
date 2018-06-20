@@ -29,7 +29,7 @@ var fixGeom = Bluebird.coroutine(function * fixGeom(tempTable, fields, db) {
       debug('geometry is all valid');
     } else {
       debug('has invalid geometry');
-      yield db.raw('update ?? set the_geom = ST_MakeValid(the_geom) where not st_isvalid(the_geom)', [tempTable]);
+      yield db.raw('update ?? set the_geom = ST_MakeValid(the_geom) where not st_isvalid(the_geom)', [tempTable]).batch();
       yield db(tempTable).delete().whereRaw('GeometryType(the_geom) = \'GEOMETRYCOLLECTION\'');
     }
     fields.set('the_geom', 'the_geom');
