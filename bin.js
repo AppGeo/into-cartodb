@@ -133,7 +133,7 @@ var spinner = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏';
 var stage = 0;
 function updateCli() {
   clearLine();
-  process.stdout.write('inserted ' + total + ' ' + spinner[stage] + '   ');
+  process.stdout.write('uploaded ' + total + ' ' + spinner[stage] + '   ');
   stage++;
   stage %= spinner.length;
 }

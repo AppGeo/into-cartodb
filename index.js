@@ -159,6 +159,7 @@ function intoCartoDB(user, key, table, options, done) {
   options.batchSize = options.batchSize || 200;
   var direct = options.direct;
   var method = options.method;
+  var i = 0;
   var toUser = new Transform({
     objectMode: true,
     transform: function (chunk, _, next) {
@@ -167,6 +168,10 @@ function intoCartoDB(user, key, table, options, done) {
       Object.keys(oldProps).forEach(function (key) {
         chunk.properties[sanatize(key)] = oldProps[key];
       });
+      i++;
+      if (!(i%100)) {
+        this.emit('inserted', i);
+      }
       this.push(chunk);
       next();
     }
