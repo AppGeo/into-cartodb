@@ -70,6 +70,8 @@ By default data is pushed into cartodb in batches of 200, you may use the `-b` a
 
 By default we stream to a temp table and then move it over after we're done, if you don't want that for whatever reason (i.e. really big data) then pass the `-d` option for a direct import, only works with create and append.
 
+The `-p` option (for coPy, also because I've already used `-c` and `-C`) uses the new carto copy api.
+
 Supported formats are
 
 - .geojson
@@ -112,8 +114,9 @@ Other options besides method which are supported include
     - a map where each entries key is the field name to be inserted into the main table and the value is the value to get it out of the temp table
     - a [cartodb-tools](https://github.com/calvinmetcalf/cartodb) database object (same api as [knex]() minus transactions)
 - batchSize: number of features to insert into cartodb at a time, defaults to 200, decrease if you are running out of memory.
+- copy: use the carto copy api
 
-  See bellow for more info.
+  See below for more info.
 
 
 Validations
