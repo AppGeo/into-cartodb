@@ -15,6 +15,8 @@ var argv = toGeojson.args
   .default('k', null, '$CARTODB_API_KEY')
   .alias('C', 'cleanup')
   .describe('C', 'clean up temp tables'.yellow)
+  .alias('p', 'copy')
+  .describe('p', 'use the copy api'.yellow)
   .alias('m', 'method')
   .default('m', 'create')
   .describe('m', 'choose import type'.yellow)
@@ -103,7 +105,8 @@ toGeojson.filename.then(function (filename) {
   toGeojson.stream().pipe(uploader(user, key, tablename, {
     method: getMethod(),
     batchSize: parseInt(argv.b, 10),
-    direct: argv.d
+    direct: argv.d,
+    copy: argv.p
   }, function (err) {
     if (err) {
       process.stdout.write((err.stack || err.toString()).red);
