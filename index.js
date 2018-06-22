@@ -4,23 +4,44 @@ var cartodb = require('cartodb-tools');
 var uploader = require('cartodb-uploader');
 var Bluebird = require('bluebird');
 var FirstN = require('first-n-stream');
-var Transform = require('readable-stream').Transform;
 var uuid = require('uuid');
-var inherits = require('inherits');
 var debug = require('debug')('into-cartodb');
 var sanatize = require('./sanatize');
 var validate = require('./validations');
+var cartoCopyStream = require('carto-copy-stream');
+var validator = require('./validator');
 var escape = require('pg-escape');
+var createOutput = require('./create-output');
+function fixProps(oldProps) {
+  var out = {};
+  var keys = Object.keys(oldProps);
+  var i = -1;
+  var key;
+  while (++i < keys.length) {
+    key = keys[i];
+    out[sanatize(key)] = oldProps[key];
+  }
+  return out;
+}
 module.exports = intoCartoDB;
 function append(db, table, toUser, options, cb) {
+  if (options.copy) {
+    return cartoCopyStream(options.user, options.key, table, options.fields, function (err, resp) {
+      if (err) {
+        return cb(err);
+      }
+      toUser.emit('inserted', resp.total_rows);
+      cb();
+    });
+  }
   return db.createWriteStream(table, {
     batchSize: options.batchSize
   })
-    .once('error', cb)
-    .once('uploaded', cb)
-    .on('inserted', function (num) {
-      toUser.emit('inserted', num);
-    });
+  .once('error', cb)
+  .once('uploaded', cb)
+  .on('inserted', function (num) {
+    toUser.emit('inserted', num);
+  });
 }
 
 var createTemptTable = Bluebird.coroutine(function * createTemptTable(table, db){
@@ -51,15 +72,8 @@ var cleanUpTempTables = Bluebird.coroutine(function * cleanUp(user, key) {
 module.exports.cleanUpTempTables = cleanUpTempTables;
 
 var swap = Bluebird.coroutine(function * swap(table, tempTable, remove, db, config) {
-  let fields = yield db(db.raw('INFORMATION_SCHEMA.COLUMNS')).select('column_name')
-  .where({
-    table_name: tempTable // eslint-disable-line camelcase
-  })
-  .whereNotIn('column_name', ['cartodb_id', 'the_geom_webmercator', 'created_at', 'updated_at', 'the_geom']);
-  fields = fields.map(function (item) {
-    return item.column_name;
-  });
   var newFields, out;
+  const fields = config.fields;
   var group = new Set();
   try {
     newFields = yield validate(tempTable, fields, config, db, group);
@@ -97,7 +111,7 @@ var swap = Bluebird.coroutine(function * swap(table, tempTable, remove, db, conf
   style: create|replace|append
 }
 */
-function exists(name, db) {
+function _exists(name, db) {
   return db(db.raw('information_schema.tables')).count('table_name').where('table_name', name).then(function (resp) {
     if (resp.length !== 1) {
       throw new Error('invalid response');
@@ -108,6 +122,34 @@ function exists(name, db) {
     return resp[0].count;
   });
 }
+function makeSchema(data) {
+  var out = new Map();
+  data.forEach(function (item) {
+    out.set(item.column_name, item.data_type);
+  });
+  return out;
+}
+var getFields = Bluebird.coroutine(function * (db, tempTable) {
+  let fields = yield db(db.raw('INFORMATION_SCHEMA.COLUMNS')).select('column_name', 'data_type')
+  .where({
+    table_name: tempTable // eslint-disable-line camelcase
+  })
+  .whereNotIn('column_name', ['cartodb_id', 'the_geom_webmercator', 'created_at', 'updated_at', 'the_geom']);
+  return {
+    fields: fields.map(function (item) {
+      return item.column_name;
+    }),
+    schema: makeSchema(fields)
+  }
+})
+const exists = Bluebird.coroutine(function * (name, db) {
+  let count = yield _exists(name, db);
+  if (count === 0) {
+    return {count};
+  }
+  let {fields, schema} = yield getFields(db, name);
+  return {count, fields, schema};
+})
 function part2(db, table, origTable, remove, toUser, config, done) {
   return append(db, table, toUser, config, function (err) {
     if (err) {
@@ -141,22 +183,12 @@ function intoCartoDB(user, key, table, options, done) {
     };
   }
   options = options || {};
+  options = Object.assign({user, key}, options)
   options.method = options.method || 'create';
   options.batchSize = options.batchSize || 200;
   var direct = options.direct;
   var method = options.method;
-  var toUser = new Transform({
-    objectMode: true,
-    transform: function (chunk, _, next) {
-      var oldProps = chunk.properties;
-      chunk.properties = {};
-      Object.keys(oldProps).forEach(function (key) {
-        chunk.properties[sanatize(key)] = oldProps[key];
-      });
-      this.push(chunk);
-      next();
-    }
-  });
+  var toUser = createOutput(options.copy);
   function warning(msg) {
     toUser.emit('warning', msg);
   }
@@ -173,7 +205,8 @@ function intoCartoDB(user, key, table, options, done) {
     toUser.emit('uploaded');
   });
   var db = cartodb(user, key);
-  exists(table, db).then(function (count) {
+  exists(table, db).then(function (res) {
+    let count = res.count;
     if (method === 'create') {
       if (count !== 0) {
         throw new Error('table already exists');
@@ -185,27 +218,34 @@ function intoCartoDB(user, key, table, options, done) {
         var uploadStream = uploader.geojson({
           user: user,
           key: key
-        }, table, function (err, r) {
+        }, table, Bluebird.coroutine(function * (err, r) {
           if (err) {
             return cb(err);
           }
           if (r.table_name !== table) {
             return cb(new Error(`exptexted "${table}" but got "${r.table_name}"`));
           }
-          if (direct) {
-            var nextPart = part2(db, table, false, true, toUser, options, cb);
-            return out.pipe(new Validator(table, db, warning)).pipe(nextPart);
-          } else {
-            return createTemptTable(table, db).then(function (id) {
-              var nextPart = part2(db, id, table, true, toUser, options, cb);
+          try {
+            let {fields, schema} = yield getFields(db, table)
+            options.fields = fields;
+            var nextPart;
+            if (direct) {
+              nextPart = part2(db, table, false, true, toUser, options, cb);
+              return out.pipe(validator(warning, schema)).pipe(nextPart);
+            } else {
+              const id = yield createTemptTable(table, db)
+              nextPart = part2(db, id, table, true, toUser, options, cb);
               resp.forEach(function (item) {
                 nextPart.write(item);
               });
-              out.pipe(new Validator(id, db, warning)).pipe(nextPart);
-            });
+              out.pipe(validator(warning, schema)).pipe(nextPart);
+            }
+          } catch (e) {
+            cb(e);
           }
-        });
+        }));
         resp.forEach(function (item) {
+          item.properties = fixProps(item.properties);
           uploadStream.write(item);
         });
         uploadStream.end();
@@ -216,127 +256,21 @@ function intoCartoDB(user, key, table, options, done) {
     if (count !== 1) {
       throw new Error('table must exist');
     }
+    options.fields = res.fields;
     if (method === 'append') {
       if (direct) {
-        return toUser.pipe(new Validator(table, db, warning)).pipe(part2(db, table, false, false, toUser, options, cb));
+        return toUser.pipe(validator(warning, res.schema)).pipe(part2(db, table, false, false, toUser, options, cb));
       } else {
         return createTemptTable(table, db).then(function (id) {
-          toUser.pipe(new Validator(id, db, warning)).pipe(part2(db, id, table, false, toUser, options, cb));
+          toUser.pipe(validator(warning, res.schema)).pipe(part2(db, id, table, false, toUser, options, cb));
         });
       }
 
     } else if (method === 'replace') {
       return createTemptTable(table, db).then(function (id) {
-        toUser.pipe(new Validator(id, db, warning)).pipe(part2(db, id, table, true, toUser, options, cb));
+        toUser.pipe(validator(warning, res.schema)).pipe(part2(db, id, table, true, toUser, options, cb));
       });
     }
   }).catch(cb);
   return toUser;
 }
-inherits(Validator, Transform);
-function Validator(id, db, warning) {
-  Transform.call(this, {
-    objectMode: true
-  });
-  this.warning = warning;
-  this.extraKeys = new Set();
-  this.schema = db(db.raw('INFORMATION_SCHEMA.COLUMNS')).select('column_name', 'data_type')
-  .where('table_name', id )
-  .whereNotIn('column_name', ['cartodb_id', 'the_geom_webmercator', 'created_at', 'updated_at', 'the_geom']).then(function (data) {
-    var out = new Map();
-    data.forEach(function (item) {
-      out.set(item.column_name, item.data_type);
-    });
-    return out;
-  });
-  this.nope = Symbol('nope');
-}
-Validator.prototype.keyWarning = function (key) {
-  if (this.extraKeys.has(key)) {
-    return;
-  }
-  this.extraKeys.add(key);
-  this.warning(`An unexpected field "${key}" was encountered. This field was not uploaded`);
-};
-Validator.prototype._transform = function (chunk, _, next) {
-  var self = this;
-  var props = chunk.properties;
-  chunk.properties = {};
-  this.schema.then(function (schema) {
-    Object.keys(props).forEach(function (key) {
-      if (!schema.has(key)) {
-        self.keyWarning(key);
-        return;
-      }
-      var typed = self.coerceType(props[key], schema.get(key));
-      if (typed === self.nope) {
-        return;
-      }
-      chunk.properties[key] = typed;
-    });
-    if (chunk.geometry || Object.keys(chunk.properties).length) {
-      self.push(chunk);
-    }
-    next();
-  }).catch(next);
-};
-const falses = new Set(['f','false','n','no','off','0']);
-const trues = new Set(['t','true','y','yes','on','1']);
-Validator.prototype.coerceType = function (value, type) {
-  if (typeof value === 'undefined' || value === null) {
-    return this.nope;
-  }
-  var out;
-  switch(type) {
-  case 'character':
-  case 'text':
-    out = String(value);
-    if (!out) {
-      return this.nope;
-    }
-    return out;
-  case 'double precision':
-    out = parseFloat(value);
-    if (out !== out) {
-      return this.nope;
-    }
-    return out;
-  case 'integer':
-    out = parseInt(value, 10);
-    if (out !== out) {
-      return this.nope;
-    }
-    if (out > 2147483647 || out < -2147483648 ) {
-      return this.nope;
-    }
-    return out;
-  case 'bigint':
-    out = parseInt(value, 10);
-    if (out !== out) {
-      return this.nope;
-    }
-    return out;
-  case 'timestamp with time zone':
-    out = new Date(value);
-    if (out.toString() === 'Invalid Date') {
-      return this.nope;
-    }
-    return out;
-  case 'boolean':
-    if (value === 'NULL') {
-      return this.nope;
-    }
-    if (typeof value !== 'string') {
-      return Boolean(value);
-    }
-    if (falses.has(value.trim().toLowerCase())) {
-      return false;
-    }
-    if (trues.has(value.trim().toLowerCase())) {
-      return true;
-    }
-    return this.nope;
-  default:
-    return this.nope;
-  }
-};
