@@ -12,17 +12,7 @@ var cartoCopyStream = require('carto-copy-stream');
 var validator = require('./validator');
 var escape = require('pg-escape');
 var createOutput = require('./create-output');
-function fixProps(oldProps) {
-  var out = {};
-  var keys = Object.keys(oldProps);
-  var i = -1;
-  var key;
-  while (++i < keys.length) {
-    key = keys[i];
-    out[sanatize(key)] = oldProps[key];
-  }
-  return out;
-}
+
 module.exports = intoCartoDB;
 function append(db, table, toUser, options, cb) {
   if (options.copy) {
@@ -245,7 +235,6 @@ function intoCartoDB(user, key, table, options, done) {
           }
         }));
         resp.forEach(function (item) {
-          item.properties = fixProps(item.properties);
           uploadStream.write(item);
         });
         uploadStream.end();
