@@ -16,7 +16,11 @@ var createOutput = require('./create-output');
 module.exports = intoCartoDB;
 function append(db, table, toUser, options, cb) {
   if (options.copy) {
-    return cartoCopyStream(options.user, options.key, table, options.fields, function (err, resp) {
+    const cartoOpts = {
+      domain: options.domain,
+      subdomainless: options.subdomainless
+    };
+    return cartoCopyStream(options.user, options.key, table, options.fields, cartoOpts, function (err, resp) {
       if (err) {
         return cb(err);
       }
@@ -39,8 +43,8 @@ var createTemptTable = Bluebird.coroutine(function * createTemptTable(table, db)
   yield db.raw('create table ?? as table ?? with no data;', [id, table]);
   return id;
 });
-var cleanUpTempTables = Bluebird.coroutine(function * cleanUp(user, key) {
-  var db = cartodb(user, key);
+var cleanUpTempTables = Bluebird.coroutine(function * cleanUp(user, key, opts) {
+  var db = cartodb(user, key, opts);
   var done = 0;
   var tables = yield db(db.raw('INFORMATION_SCHEMA.tables')).select('table_name')
  .where('table_name', 'like', '%\_temp\_________\_____\_____\_____\_____________')
@@ -194,7 +198,11 @@ function intoCartoDB(user, key, table, options, done) {
     }
     toUser.emit('uploaded');
   });
-  var db = cartodb(user, key);
+  var cartoOpts = {
+    domain: options.domain,
+    subdomainless: options.subdomainless
+  };
+  var db = cartodb(user, key, cartoOpts);
   exists(table, db).then(function (res) {
     let count = res.count;
     if (method === 'create') {
@@ -207,7 +215,9 @@ function intoCartoDB(user, key, table, options, done) {
         }
         var uploadStream = uploader.geojson({
           user: user,
-          key: key
+          key: key,
+          domain: options.domain,
+          subdomainless: options.subdomainless
         }, table, Bluebird.coroutine(function * (err, r) {
           if (err) {
             return cb(err);

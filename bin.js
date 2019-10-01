@@ -37,6 +37,12 @@ var argv = toGeojson.args
   .default('b', 200)
   .alias('d', 'direct')
   .describe('d', 'upload directly to the table (create/append only)'.yellow)
+  .alias('s', 'subdomainless')
+  .boolean('s')
+  .default('s', undefined)
+  .describe('s', 'whether to use subdomainless url mode'.yellow)
+  .alias('D', 'domain')
+  .describe('D', 'whether to use the non default domain'.yellow)
   .argv;
 
 if (argv.version) {
@@ -71,9 +77,12 @@ if (typeof user === 'string' && user.indexOf('@') > -1) {
   exit += 4;
 }
 if (!exit && argv.C) {
-  return uploader.cleanUpTempTables(user, key).then(function (num) {
+  return uploader.cleanUpTempTables(user, key, {
+    subdomainless: argv.s,
+    domain: argv.D
+  }).then(function (num) {
     if (num === 0) {
-      process.stdout.write(`no tables to clean up\n`.green);
+      process.stdout.write('no tables to clean up\n'.green);
     } else {
       process.stdout.write(`cleaned up ${num} tables\n`.green);
     }
@@ -106,7 +115,9 @@ toGeojson.filename.then(function (filename) {
     method: getMethod(),
     batchSize: parseInt(argv.b, 10),
     direct: argv.d,
-    copy: argv.p
+    copy: argv.p,
+    subdomainless: argv.s,
+    domain: argv.D
   }, function (err) {
     if (err) {
       process.stdout.write((err.stack || err.toString()).red);
