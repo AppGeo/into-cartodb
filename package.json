@@ -22,9 +22,9 @@
   "license": "MIT",
   "dependencies": {
     "bluebird": "^2.10.0",
-    "carto-copy-stream": "^0.1.2",
-    "cartodb-tools": "^2.4.0",
-    "cartodb-uploader": "^2.0.1",
+    "carto-copy-stream": "^1.0.0",
+    "cartodb-tools": "^2.10.0",
+    "cartodb-uploader": "^2.1.0",
     "colors": "^1.1.2",
     "debug": "^2.2.0",
     "duplexify": "^3.4.2",
@@ -34,7 +34,7 @@
     "once": "^1.3.2",
     "pg-escape": "^0.1.0",
     "readable-stream": "^2.0.2",
-    "to-geojson-stream": "^1.0.1",
+    "to-geojson-stream": "^1.0.3",
     "uuid": "^3.0.0"
   },
   "devDependencies": {
