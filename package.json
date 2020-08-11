@@ -23,7 +23,7 @@
   "dependencies": {
     "bluebird": "^2.10.0",
     "carto-copy-stream": "^1.0.0",
-    "cartodb-tools": "^2.10.0",
+    "cartodb-tools": "~2.10.0",
     "cartodb-uploader": "^2.1.0",
     "colors": "^1.1.2",
     "debug": "^2.2.0",
