@@ -3,7 +3,21 @@
 var toGeojson = require('to-geojson-stream')();
 var uploader = require('./');
 require('colors');
-
+function handleError(e) {
+  if (!e) {
+    e = new Error('unknown error');
+  }
+  if (e.stack) {
+    process.stdout.write((e.stack).red);
+  } else if (typeof e === 'object') {
+    process.stdout.write(JSON.stringify(e, false, 2).red);
+  } else if (typeof e === 'string') {
+    process.stdout.write(e.red);
+  } else {
+    process.stdout.write(e.toString().red);
+  }
+  process.stdout.write('\n');
+}
 var readline = require('readline');
 var path = require('path');
 var argv = toGeojson.args
@@ -88,7 +102,8 @@ if (!exit && argv.C) {
     }
     process.exit(0);// eslint-disable-line no-process-exit
   }).catch(function (e) {
-    process.stdout.write((e && e.stack || e || 'fail').red);
+    process.stdout.write('error cleaning up temp tables\n'.red);
+    handleError(e);
     process.exit(49);// eslint-disable-line no-process-exit
   });
 }
@@ -120,8 +135,7 @@ toGeojson.filename.then(function (filename) {
     domain: argv.D
   }, function (err) {
     if (err) {
-      process.stdout.write((err.stack || err.toString()).red);
-      process.stdout.write('\n');
+      handleError(err);
       process.exit(8);// eslint-disable-line no-process-exit
     }
     updateCli();
@@ -134,7 +148,7 @@ toGeojson.filename.then(function (filename) {
 }).catch(function (e) {
   process.stdout.write('\noh no!'.red);
   process.stdout.write('\n');
-  process.stdout.write((e && e.stack || e).red);
+  handleError(e);
   process.exit(1);// eslint-disable-line no-process-exit
 });
 function clearLine() {
