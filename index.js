@@ -1,20 +1,18 @@
-'use strict';
-var once = require('once');
-var cartodb = require('cartodb-tools');
-var uploader = require('cartodb-uploader');
-var Bluebird = require('bluebird');
-var FirstN = require('first-n-stream');
-var uuid = require('uuid');
-var debug = require('debug')('into-cartodb');
-var sanatize = require('./sanatize');
-var validate = require('./validations');
-var cartoCopyStream = require('carto-copy-stream');
-var validator = require('./validator');
-var escape = require('pg-escape');
-var createOutput = require('./create-output');
+const once = require('once');
+const cartodb = require('cartodb-tools');
+const uploader = require('cartodb-uploader');
+const FirstN = require('first-n-stream');
+const uuid = require('uuid');
+const debug = require('debug')('into-cartodb');
+const sanatize = require('./sanatize');
+const validate = require('./validations');
+const cartoCopyStream = require('carto-copy-stream');
+const validator = require('./validator');
+const escape = require('pg-escape');
+const createOutput = require('./create-output');
 
 module.exports = intoCartoDB;
-function append(db, table, toUser, options, cb) {
+function append (db, table, toUser, options, cb) {
   if (options.copy) {
     const cartoOpts = {
       domain: options.domain,
@@ -31,47 +29,46 @@ function append(db, table, toUser, options, cb) {
   return db.createWriteStream(table, {
     batchSize: options.batchSize
   })
-  .once('error', cb)
-  .once('uploaded', cb)
-  .on('inserted', function (num) {
-    toUser.emit('inserted', num);
-  });
+    .once('error', cb)
+    .once('uploaded', cb)
+    .on('inserted', function (num) {
+      toUser.emit('inserted', num);
+    });
 }
 
-var createTemptTable = Bluebird.coroutine(function * createTemptTable(table, db){
-  var id = `${table.slice(0, 21)}_temp_${uuid().replace(/-/g, '_')}`;
-  yield db.raw('create table ?? as table ?? with no data;', [id, table]);
+const createTemptTable = async (table, db) => {
+  const id = `${table.slice(0, 21)}_temp_${uuid().replace(/-/g, '_')}`;
+  await db.raw('create table ?? as table ?? with no data;', [id, table]);
   return id;
-});
-var cleanUpTempTables = Bluebird.coroutine(function * cleanUp(user, key, opts) {
-  var db = cartodb(user, key, opts);
-  var done = 0;
-  var tables = yield db(db.raw('INFORMATION_SCHEMA.tables')).select('table_name')
- .where('table_name', 'like', '%\_temp\_________\_____\_____\_____\_____________')
- .groupBy('table_name');
+};
+const cleanUpTempTables = async function * cleanUp (user, key, opts) {
+  const db = cartodb(user, key, opts);
+  let done = 0;
+  let tables = await db(db.raw('INFORMATION_SCHEMA.tables')).select('table_name')
+    .where('table_name', 'like', '%\_temp\_________\_____\_____\_____\_____________') // eslint-disable-line no-useless-escape
+    .groupBy('table_name');
   if (!tables.length) {
     return 0;
   }
   tables = tables.map(function (item) {
     return item.table_name;
   });
-  for (let name of tables) {
-    yield db.schema.dropTableIfExists(name);
+  for (const name of tables) {
+    await db.schema.dropTableIfExists(name);
     ++done;
   }
   return done;
-});
-
+};
 
 module.exports.cleanUpTempTables = cleanUpTempTables;
 
-var swap = Bluebird.coroutine(function * swap(table, tempTable, remove, db, config) {
-  var newFields, out;
+const swap = async function swap (table, tempTable, remove, db, config) {
+  let newFields, out;
   const fields = config.fields;
-  var group = new Set();
+  const group = new Set();
   try {
-    newFields = yield validate(tempTable, fields, config, db, group);
-  } catch(e) {
+    newFields = await validate(tempTable, fields, config, db, group);
+  } catch (e) {
     debug(e);
     if (config.method === 'create') {
       out = db.raw(escape('DROP TABLE %I, %I;', table, tempTable));
@@ -82,13 +79,13 @@ var swap = Bluebird.coroutine(function * swap(table, tempTable, remove, db, conf
       return Promise.reject(e || new Error('validation failed'));
     });
   }
-  var fromFields = [];
-  var toFields = [];
+  const fromFields = [];
+  const toFields = [];
   newFields.forEach(function (value, key) {
     fromFields.push(value);
     toFields.push(key);
   });
-  var groupFields = [];
+  const groupFields = [];
   group.forEach(function (field) {
     groupFields.push(field);
   });
@@ -97,15 +94,15 @@ var swap = Bluebird.coroutine(function * swap(table, tempTable, remove, db, conf
       INSERT into ?? (${toFields.join(',')})
       SELECT ${fromFields.join(',')} from ??
       ${groupFields.length ? `group by ${groupFields.join(',')}` : ''};
-  `,[table, tempTable]).batch().onSuccess(db.raw('DROP TABLE ??;', [tempTable])).onError(db.raw('DROP TABLE ??;', [tempTable]));
-});
+  `, [table, tempTable]).batch().onSuccess(db.raw('DROP TABLE ??;', [tempTable])).onError(db.raw('DROP TABLE ??;', [tempTable]));
+};
 
 /*
 {
   style: create|replace|append
 }
 */
-function _exists(name, db) {
+function _exists (name, db) {
   return db(db.raw('information_schema.tables')).count('table_name').where('table_name', name).then(function (resp) {
     if (resp.length !== 1) {
       throw new Error('invalid response');
@@ -116,35 +113,35 @@ function _exists(name, db) {
     return resp[0].count;
   });
 }
-function makeSchema(data) {
-  var out = new Map();
+function makeSchema (data) {
+  const out = new Map();
   data.forEach(function (item) {
     out.set(item.column_name, item.data_type);
   });
   return out;
 }
-var getFields = Bluebird.coroutine(function * (db, tempTable) {
-  let fields = yield db(db.raw('INFORMATION_SCHEMA.COLUMNS')).select('column_name', 'data_type')
-  .where({
-    table_name: tempTable // eslint-disable-line camelcase
-  })
-  .whereNotIn('column_name', ['cartodb_id', 'the_geom_webmercator', 'created_at', 'updated_at', 'the_geom']);
+const getFields = async function (db, tempTable) {
+  const fields = await db(db.raw('INFORMATION_SCHEMA.COLUMNS')).select('column_name', 'data_type')
+    .where({
+      table_name: tempTable // eslint-disable-line camelcase
+    })
+    .whereNotIn('column_name', ['cartodb_id', 'the_geom_webmercator', 'created_at', 'updated_at', 'the_geom']);
   return {
     fields: fields.map(function (item) {
       return item.column_name;
     }),
     schema: makeSchema(fields)
-  }
-})
-const exists = Bluebird.coroutine(function * (name, db) {
-  let count = yield _exists(name, db);
+  };
+};
+const exists = async function (name, db) {
+  const count = await _exists(name, db);
   if (count === 0) {
-    return {count};
+    return { count };
   }
-  let {fields, schema} = yield getFields(db, name);
-  return {count, fields, schema};
-})
-function part2(db, table, origTable, remove, toUser, config, done) {
+  const { fields, schema } = await getFields(db, name);
+  return { count, fields, schema };
+};
+function part2 (db, table, origTable, remove, toUser, config, done) {
   return append(db, table, toUser, config, function (err) {
     if (err) {
       return done(err);
@@ -158,11 +155,10 @@ function part2(db, table, origTable, remove, toUser, config, done) {
   });
 }
 
-function intoCartoDB(user, key, table, options, done) {
-
+function intoCartoDB (user, key, table, options, done) {
   table = sanatize(table);
   if (table.match(/^[^a-z_]/)) {
-    table = 'table_' + table
+    table = 'table_' + table;
   } else if (table[0] === '_') {
     table = 'table' + table;
   }
@@ -177,16 +173,16 @@ function intoCartoDB(user, key, table, options, done) {
     };
   }
   options = options || {};
-  options = Object.assign({user, key}, options)
+  options = Object.assign({ user, key }, options);
   options.method = options.method || 'create';
   options.batchSize = options.batchSize || 200;
-  var direct = options.direct;
-  var method = options.method;
-  var toUser = createOutput(options.copy);
-  function warning(msg) {
+  const direct = options.direct;
+  const method = options.method;
+  const toUser = createOutput(options.copy);
+  function warning (msg) {
     toUser.emit('warning', msg);
   }
-  var cb = once(function (err, resp) {
+  const cb = once(function (err, resp) {
     if (err) {
       if (done) {
         return done(err);
@@ -198,27 +194,27 @@ function intoCartoDB(user, key, table, options, done) {
     }
     toUser.emit('uploaded');
   });
-  var cartoOpts = {
+  const cartoOpts = {
     domain: options.domain,
     subdomainless: options.subdomainless
   };
-  var db = cartodb(user, key, cartoOpts);
+  const db = cartodb(user, key, cartoOpts);
   exists(table, db).then(function (res) {
-    let count = res.count;
+    const count = res.count;
     if (method === 'create') {
       if (count !== 0) {
         throw new Error('table already exists');
       }
-      let out = new FirstN(options.batchSize, function (err, resp) {
+      const out = new FirstN(options.batchSize, function (err, resp) {
         if (err) {
           return cb(err);
         }
-        var uploadStream = uploader.geojson({
+        const uploadStream = uploader.geojson({
           user: user,
           key: key,
           domain: options.domain,
           subdomainless: options.subdomainless
-        }, table, Bluebird.coroutine(function * (err, r) {
+        }, table, async function (err, r) {
           if (err) {
             return cb(err);
           }
@@ -226,14 +222,14 @@ function intoCartoDB(user, key, table, options, done) {
             return cb(new Error(`exptexted "${table}" but got "${r.table_name}"`));
           }
           try {
-            let {fields, schema} = yield getFields(db, table)
+            const { fields, schema } = await getFields(db, table);
             options.fields = fields;
-            var nextPart;
+            let nextPart;
             if (direct) {
               nextPart = part2(db, table, false, true, toUser, options, cb);
               return out.pipe(validator(warning, schema)).pipe(nextPart);
             } else {
-              const id = yield createTemptTable(table, db)
+              const id = await createTemptTable(table, db);
               nextPart = part2(db, id, table, true, toUser, options, cb);
               resp.forEach(function (item) {
                 nextPart.write(item);
@@ -243,7 +239,7 @@ function intoCartoDB(user, key, table, options, done) {
           } catch (e) {
             cb(e);
           }
-        }));
+        });
         resp.forEach(function (item) {
           uploadStream.write(item);
         });
@@ -264,7 +260,6 @@ function intoCartoDB(user, key, table, options, done) {
           toUser.pipe(validator(warning, res.schema)).pipe(part2(db, id, table, false, toUser, options, cb));
         });
       }
-
     } else if (method === 'replace') {
       return createTemptTable(table, db).then(function (id) {
         toUser.pipe(validator(warning, res.schema)).pipe(part2(db, id, table, true, toUser, options, cb));

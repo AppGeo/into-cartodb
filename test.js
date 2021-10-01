@@ -1,14 +1,14 @@
 'use strict';
-var test = require('tape');
-var intoCartodb = require('./');
-var auth = require('./auth.json');
-var cartodb = require('cartodb-tools')(auth.user, auth.key);
-var crypto = require('crypto');
-var badGeom = require('./badgeom.json');
+const test = require('tape');
+const intoCartodb = require('./');
+const auth = require('./auth.json');
+const cartodb = require('cartodb-tools')(auth.user, auth.key);
+const crypto = require('crypto');
+const badGeom = require('./badgeom.json');
 test('crud', function (t) {
-  var table = 'test_table_into_carto' + crypto.randomBytes(8).toString('hex');
-  var tablewithDash = 'test-table_into_carto' + crypto.randomBytes(8).toString('hex');
-  var tablewithOutDash = tablewithDash.replace(/-/g, '_');
+  let table = 'test_table_into_carto' + crypto.randomBytes(8).toString('hex');
+  const tablewithDash = 'test-table_into_carto' + crypto.randomBytes(8).toString('hex');
+  const tablewithOutDash = tablewithDash.replace(/-/g, '_');
   t.test('maybe delete', function (t) {
     t.plan(1);
     cartodb.schema.dropTableIfExists(table).exec(function (err) {
@@ -29,8 +29,8 @@ test('crud', function (t) {
     });
   });
   t.test('create', function (t) {
-    var inserted = 0;
-    var stream = intoCartodb(auth.user, auth.key, table, function (err) {
+    let inserted = 0;
+    const stream = intoCartodb(auth.user, auth.key, table, function (err) {
       t.error(err, 'no error');
       t.equals(inserted, 160);
       cartodb(table).select().where('foo_blahoela', 'foo_blahoela').where('_as', '_as').where('fooo', 'fooo').exec(function (err, resp) {
@@ -43,7 +43,7 @@ test('crud', function (t) {
       t.ok(true, 'inserted');
       inserted += num;
     });
-    var i = -1;
+    let i = -1;
     while (++i < 160) {
       stream.write({
         type: 'Feature',
@@ -54,7 +54,7 @@ test('crud', function (t) {
           '<foo>as': '_as',
           '?#fooo': 'fooo',
           bar: true
-          },
+        },
         geometry: null
       });
     }
@@ -70,12 +70,12 @@ test('crud', function (t) {
     t.plan(2);
     cartodb(table).count('num').exec(function (err, resp) {
       t.error(err);
-      t.deepEquals(resp, [{count: 160}]);
+      t.deepEquals(resp, [{ count: 160 }]);
     });
   });
   t.test('append', function (t) {
-    var inserted = 0;
-    var stream = intoCartodb(auth.user, auth.key, table, 'append', function (err) {
+    let inserted = 0;
+    const stream = intoCartodb(auth.user, auth.key, table, 'append', function (err) {
       t.error(err, 'no error');
       t.equals(inserted, 230);
       t.end();
@@ -84,7 +84,7 @@ test('crud', function (t) {
       t.ok(true, 'inserted');
       inserted += num;
     });
-    var i = -1;
+    let i = -1;
     while (++i < 230) {
       stream.write({
         type: 'Feature',
@@ -100,20 +100,20 @@ test('crud', function (t) {
     t.plan(2);
     cartodb(table).count('num').exec(function (err, resp) {
       t.error(err);
-      t.deepEquals(resp, [{count: 390}]);
+      t.deepEquals(resp, [{ count: 390 }]);
     });
   });
   t.test('replace', function (t) {
-    var inserted = 0;
+    let inserted = 0;
     t.plan(2);
-    var stream = intoCartodb(auth.user, auth.key, table, 'replace', function (err) {
+    const stream = intoCartodb(auth.user, auth.key, table, 'replace', function (err) {
       t.error(err, 'no error');
       t.equals(inserted, 75);
     });
     stream.on('inserted', function (num) {
       inserted += num;
     });
-    var i = -1;
+    let i = -1;
     while (++i < 75) {
       stream.write({
         type: 'Feature',
@@ -129,7 +129,7 @@ test('crud', function (t) {
     t.plan(2);
     cartodb(table).count('num').exec(function (err, resp) {
       t.error(err);
-      t.deepEquals(resp, [{count: 75}]);
+      t.deepEquals(resp, [{ count: 75 }]);
     });
   });
   t.test('maybe delete again', function (t) {
@@ -140,20 +140,20 @@ test('crud', function (t) {
     });
   });
   t.test('create less then 50', function (t) {
-    var inserted = 0;
+    let inserted = 0;
     t.plan(4);
-    var stream = intoCartodb(auth.user, auth.key, table, function (err) {
+    const stream = intoCartodb(auth.user, auth.key, table, function (err) {
       t.error(err, 'no error');
       t.equals(inserted, 40);
       cartodb(table).count('num').exec(function (err, resp) {
         t.error(err);
-        t.deepEquals(resp, [{count: 40}]);
+        t.deepEquals(resp, [{ count: 40 }]);
       });
     });
     stream.on('inserted', function (num) {
       inserted += num;
     });
-    var i = -1;
+    let i = -1;
     while (++i < 40) {
       stream.write({
         type: 'Feature',
@@ -177,7 +177,10 @@ test('crud', function (t) {
   });
   t.test('booleans', function (t) {
     t.plan(2);
-    var stream = intoCartodb(auth.user, auth.key, table, {batchSize: 50}, function (err) {
+    const stream = intoCartodb(auth.user, auth.key, table, { batchSize: 50 }, function (err) {
+      if (err) {
+        t.ok(false, err);
+      }
       cartodb(table).count('b').where({
         b: true
       }).exec(function (err, data) {
@@ -185,7 +188,7 @@ test('crud', function (t) {
         t.equals(data[0].count, 3);
       });
     });
-    var i = -1;
+    let i = -1;
     while (++i < 210) {
       stream.write({
         type: 'Feature',
@@ -246,15 +249,15 @@ test('crud', function (t) {
   });
   t.test('geometry weirdness', function (t) {
     t.plan(5);
-    var stream = intoCartodb(auth.user, auth.key, table, function (err) {
+    const stream = intoCartodb(auth.user, auth.key, table, function (err) {
       t.error(err);
       cartodb(table).count('num').whereRaw('GeometryType(the_geom) = \'GEOMETRYCOLLECTION\'').exec(function (err, resp) {
         t.error(err);
-        t.deepEquals(resp, [{count: 0}]);
+        t.deepEquals(resp, [{ count: 0 }]);
       });
       cartodb(table).count('num').exec(function (err, resp) {
         t.error(err);
-        t.deepEquals(resp, [{count: 1}]);
+        t.deepEquals(resp, [{ count: 1 }]);
       });
     });
 
@@ -286,9 +289,9 @@ test('crud', function (t) {
   });
   t.test('test validations', function (t) {
     t.plan(9);
-    var inserted = 0;
-    var validityError = new Error('no geometry found');
-    function validator(tempTable, fields) {
+    let inserted = 0;
+    const validityError = new Error('no geometry found');
+    function validator (tempTable, fields) {
       t.ok(true, 'validator ran');
       if (fields.has('the_geom')) {
         return Promise.resolve();
@@ -296,25 +299,25 @@ test('crud', function (t) {
         return Promise.reject(validityError);
       }
     }
-    var stream1 = intoCartodb(auth.user, auth.key, table, {
+    const stream1 = intoCartodb(auth.user, auth.key, table, {
       validations: [validator]
     }, function (err) {
       t.error(err, 'no error');
       t.equals(inserted, 40);
       cartodb(table).count('num').exec(function (err, resp) {
         t.error(err);
-        t.deepEquals(resp, [{count: 40}]);
-        var stream2 = intoCartodb(auth.user, auth.key, table, {
+        t.deepEquals(resp, [{ count: 40 }]);
+        const stream2 = intoCartodb(auth.user, auth.key, table, {
           validations: [validator],
           method: 'replace'
         }, function (err) {
           t.equals(validityError, err, 'correct error');
           cartodb(cartodb.raw('information_schema.tables')).count('table_name').where('table_name', table).exec(function (err, resp) {
             t.error(err);
-            t.deepEquals(resp, [{count: 1}]);
+            t.deepEquals(resp, [{ count: 1 }]);
           });
         });
-        var i = -1;
+        let i = -1;
         while (++i < 40) {
           stream2.write({
             type: 'Feature',
@@ -330,7 +333,7 @@ test('crud', function (t) {
     stream1.on('inserted', function (num) {
       inserted += num;
     });
-    var i = -1;
+    let i = -1;
     while (++i < 40) {
       stream1.write({
         type: 'Feature',
@@ -354,8 +357,8 @@ test('crud', function (t) {
   });
   t.test('test validation cleanup', function (t) {
     t.plan(4);
-    var validityError = new Error('no geometry found');
-    function validator(tempTable, fields) {
+    const validityError = new Error('no geometry found');
+    function validator (tempTable, fields) {
       t.ok(true, 'validator ran');
       if (fields.has('the_geom')) {
         return Promise.resolve();
@@ -363,17 +366,17 @@ test('crud', function (t) {
         return Promise.reject(validityError);
       }
     }
-    var stream1 = intoCartodb(auth.user, auth.key, table, {
+    const stream1 = intoCartodb(auth.user, auth.key, table, {
       validations: [validator]
     }, function (err) {
       t.equals(validityError, err, 'correct error');
       cartodb(cartodb.raw('information_schema.tables')).count('table_name').where('table_name', table).exec(function (err, resp) {
         t.error(err);
-        t.deepEquals(resp, [{count: 0}]);
+        t.deepEquals(resp, [{ count: 0 }]);
       });
     });
 
-    var i = -1;
+    let i = -1;
     while (++i < 40) {
       stream1.write({
         type: 'Feature',
@@ -394,14 +397,14 @@ test('crud', function (t) {
   });
   t.test('test validation groups', function (t) {
     t.plan(4);
-    function validator(tempTable, fields, db, group) {
+    function validator (tempTable, fields, db, group) {
       t.ok(true, 'validator ran');
       group.add('even');
       fields.set('num', 'sum(num) as num');
       fields.set('the_geom', 'ST_Union(the_geom) as the_geom');
       return Promise.resolve();
     }
-    var stream1 = intoCartodb(auth.user, auth.key, table, {
+    const stream1 = intoCartodb(auth.user, auth.key, table, {
       validations: [validator]
     }, function (err) {
       t.error(err);
@@ -412,11 +415,11 @@ test('crud', function (t) {
             return 1;
           }
           return -1;
-        }), [{even: true, num: 380}, {even: false, num: 400}]);
+        }), [{ even: true, num: 380 }, { even: false, num: 400 }]);
       });
     });
 
-    var i = -1;
+    let i = -1;
     while (++i < 40) {
       stream1.write({
         type: 'Feature',
@@ -448,8 +451,8 @@ test('crud', function (t) {
     });
   });
   t.test('create with dash', function (t) {
-    var inserted = 0;
-    var stream = intoCartodb(auth.user, auth.key, tablewithDash, function (err) {
+    let inserted = 0;
+    const stream = intoCartodb(auth.user, auth.key, tablewithDash, function (err) {
       t.error(err, 'no error');
       t.equals(inserted, 160);
       cartodb(tablewithOutDash).select().where('foo_blahoela', 'foo_blahoela').where('_as', '_as').where('fooo', 'fooo').where('dash_dash', 'dash-dash').exec(function (err, resp) {
@@ -462,7 +465,7 @@ test('crud', function (t) {
       t.ok(true, 'inserted');
       inserted += num;
     });
-    var i = -1;
+    let i = -1;
     while (++i < 160) {
       stream.write({
         type: 'Feature',
@@ -473,7 +476,7 @@ test('crud', function (t) {
           '<foo>as': '_as',
           '?#fooo': 'fooo',
           'dash-dash': 'dash-dash'
-          },
+        },
         geometry: null
       });
     }
@@ -494,10 +497,10 @@ test('crud', function (t) {
   });
   t.test('extra field throws a warning', function (t) {
     t.plan(6);
-    var stream1 = intoCartodb(auth.user, auth.key, table, function (err) {
+    const stream1 = intoCartodb(auth.user, auth.key, table, function (err) {
       t.error(err, 'no error for stream 1');
-      var inserted = 0;
-      var stream2 = intoCartodb(auth.user, auth.key, table, 'append', function (err) {
+      let inserted = 0;
+      const stream2 = intoCartodb(auth.user, auth.key, table, 'append', function (err) {
         t.error(err, 'no error for stream 2');
         t.equals(inserted, 4, 'inserted correct ammount');
       }).on('inserted', function (n) {
@@ -562,8 +565,8 @@ test('crud', function (t) {
     });
   });
   t.test('leading number', function (t) {
-    var inserted = 0;
-    var stream = intoCartodb(auth.user, auth.key, table, function (err) {
+    let inserted = 0;
+    const stream = intoCartodb(auth.user, auth.key, table, function (err) {
       t.error(err, 'no error');
       t.equals(inserted, 160);
       cartodb('table_' + table).select().where('foo_blahoela', 'foo_blahoela').where('_as', '_as').where('fooo', 'fooo').exec(function (err, resp) {
@@ -576,7 +579,7 @@ test('crud', function (t) {
       t.ok(true, 'inserted');
       inserted += num;
     });
-    var i = -1;
+    let i = -1;
     while (++i < 160) {
       stream.write({
         type: 'Feature',
@@ -587,7 +590,7 @@ test('crud', function (t) {
           '<foo>as': '_as',
           '?#fooo': 'fooo',
           bar: true
-          },
+        },
         geometry: null
       });
     }
@@ -601,8 +604,8 @@ test('crud', function (t) {
     });
   });
   t.test('leading underscore', function (t) {
-    var inserted = 0;
-    var stream = intoCartodb(auth.user, auth.key, table, function (err) {
+    let inserted = 0;
+    const stream = intoCartodb(auth.user, auth.key, table, function (err) {
       t.error(err, 'no error');
       t.equals(inserted, 160);
       cartodb('table' + table).select().where('foo_blahoela', 'foo_blahoela').where('_as', '_as').where('fooo', 'fooo').exec(function (err, resp) {
@@ -615,7 +618,7 @@ test('crud', function (t) {
       t.ok(true, 'inserted');
       inserted += num;
     });
-    var i = -1;
+    let i = -1;
     while (++i < 160) {
       stream.write({
         type: 'Feature',
@@ -626,7 +629,7 @@ test('crud', function (t) {
           '<foo>as': '_as',
           '?#fooo': 'fooo',
           bar: true
-          },
+        },
         geometry: null
       });
     }
