@@ -1,12 +1,12 @@
-var Transform = require('readable-stream').Transform;
-var inherits = require('inherits');
+const Transform = require('readable-stream').Transform;
+const inherits = require('inherits');
 
 inherits(Validator, Transform);
 module.exports = validator;
-function validator(warning, schema) {
+function validator (warning, schema) {
   return new Validator(warning, schema);
 }
-function Validator(warning, schema) {
+function Validator (warning, schema) {
   Transform.call(this, {
     objectMode: true
   });
@@ -23,8 +23,8 @@ Validator.prototype.keyWarning = function (key) {
   this.warning(`An unexpected field "${key}" was encountered. This field was not uploaded`);
 };
 Validator.prototype._transform = function (chunk, _, next) {
-  var self = this;
-  var props = chunk.properties;
+  const self = this;
+  const props = chunk.properties;
   chunk.properties = {};
   const schema = this.schema;
   Object.keys(props).forEach(function (key) {
@@ -32,7 +32,7 @@ Validator.prototype._transform = function (chunk, _, next) {
       self.keyWarning(key);
       return;
     }
-    var typed = self.coerceType(props[key], schema.get(key));
+    const typed = self.coerceType(props[key], schema.get(key));
     if (typed === self.nope) {
       return;
     }
@@ -42,16 +42,15 @@ Validator.prototype._transform = function (chunk, _, next) {
     self.push(chunk);
   }
   next();
-
 };
-const falses = new Set(['f','false','n','no','off','0']);
-const trues = new Set(['t','true','y','yes','on','1']);
+const falses = new Set(['f', 'false', 'n', 'no', 'off', '0']);
+const trues = new Set(['t', 'true', 'y', 'yes', 'on', '1']);
 Validator.prototype.coerceType = function (value, type) {
   if (typeof value === 'undefined' || value === null) {
     return this.nope;
   }
-  var out;
-  switch(type) {
+  let out;
+  switch (type) {
     case 'character':
     case 'text':
       out = String(value);
@@ -61,22 +60,22 @@ Validator.prototype.coerceType = function (value, type) {
       return out;
     case 'double precision':
       out = parseFloat(value);
-      if (out !== out) {
+      if (Number.isNaN(out)) {
         return this.nope;
       }
       return out;
     case 'integer':
       out = parseInt(value, 10);
-      if (out !== out) {
+      if (Number.isNaN(out)) {
         return this.nope;
       }
-      if (out > 2147483647 || out < -2147483648 ) {
+      if (out > 2147483647 || out < -2147483648) {
         return this.nope;
       }
       return out;
     case 'bigint':
       out = parseInt(value, 10);
-      if (out !== out) {
+      if (Number.isNaN(out)) {
         return this.nope;
       }
       return out;

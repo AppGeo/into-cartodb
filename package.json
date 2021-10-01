@@ -21,7 +21,6 @@
   "author": "Calvin W. Metcalf <calvin.metcalf@gmail.com>",
   "license": "MIT",
   "dependencies": {
-    "bluebird": "^2.10.0",
     "carto-copy-stream": "^1.0.0",
     "cartodb-tools": "^2.11.1",
     "cartodb-uploader": "^2.1.0",
@@ -38,6 +37,7 @@
     "uuid": "^3.0.0"
   },
   "devDependencies": {
+    "semistandard": "^16.0.1",
     "tap-nyan": "0.0.2",
     "tape": "^4.2.0"
   },
