@@ -52,55 +52,56 @@ Validator.prototype.coerceType = function (value, type) {
   }
   var out;
   switch(type) {
-    case 'character':
-    case 'text':
-      out = String(value);
-      if (!out) {
-        return this.nope;
-      }
-      return out;
-    case 'double precision':
-      out = parseFloat(value);
-      if (out !== out) {
-        return this.nope;
-      }
-      return out;
-    case 'integer':
-      out = parseInt(value, 10);
-      if (out !== out) {
-        return this.nope;
-      }
-      if (out > 2147483647 || out < -2147483648 ) {
-        return this.nope;
-      }
-      return out;
-    case 'bigint':
-      out = parseInt(value, 10);
-      if (out !== out) {
-        return this.nope;
-      }
-      return out;
-    case 'timestamp with time zone':
-      out = new Date(value);
-      if (out.toString() === 'Invalid Date') {
-        return this.nope;
-      }
-      return out;
-    case 'boolean':
-      if (value === 'NULL') {
-        return this.nope;
-      }
-      if (typeof value !== 'string') {
-        return Boolean(value);
-      }
-      if (falses.has(value.trim().toLowerCase())) {
-        return false;
-      }
-      if (trues.has(value.trim().toLowerCase())) {
-        return true;
-      }
+  case 'character':
+  case 'text':
+    out = String(value);
+    if (!out) {
       return this.nope;
-    default:
+    }
+    return out;
+  case 'double precision':
+    out = parseFloat(value);
+    if (out !== out) {
       return this.nope;
+    }
+    return out;
+  case 'integer':
+    out = parseInt(value, 10);
+    if (out !== out) {
+      return this.nope;
+    }
+    if (out > 2147483647 || out < -2147483648 ) {
+      return this.nope;
+    }
+    return out;
+  case 'bigint':
+    out = parseInt(value, 10);
+    if (out !== out) {
+      return this.nope;
+    }
+    return out;
+  case 'timestamp with time zone':
+  case 'date':
+    out = new Date(value);
+    if (out.toString() === 'Invalid Date') {
+      return this.nope;
+    }
+    return out;
+  case 'boolean':
+    if (value === 'NULL') {
+      return this.nope;
+    }
+    if (typeof value !== 'string') {
+      return Boolean(value);
+    }
+    if (falses.has(value.trim().toLowerCase())) {
+      return false;
+    }
+    if (trues.has(value.trim().toLowerCase())) {
+      return true;
+    }
+    return this.nope;
+  default:
+    return this.nope;
   }
 };
