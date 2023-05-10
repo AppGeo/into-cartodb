@@ -12,7 +12,6 @@ var cartoCopyStream = require('carto-copy-stream');
 var validator = require('./validator');
 var escape = require('pg-escape');
 var createOutput = require('./create-output');
-
 module.exports = intoCartoDB;
 function append(db, table, toUser, options, cb) {
   if (options.copy) {
@@ -31,11 +30,11 @@ function append(db, table, toUser, options, cb) {
   return db.createWriteStream(table, {
     batchSize: options.batchSize
   })
-  .once('error', cb)
-  .once('uploaded', cb)
-  .on('inserted', function (num) {
-    toUser.emit('inserted', num);
-  });
+    .once('error', cb)
+    .once('uploaded', cb)
+    .on('inserted', function (num) {
+      toUser.emit('inserted', num);
+    });
 }
 
 var createTemptTable = Bluebird.coroutine(function * createTemptTable(table, db){
@@ -47,8 +46,8 @@ var cleanUpTempTables = Bluebird.coroutine(function * cleanUp(user, key, opts) {
   var db = cartodb(user, key, opts);
   var done = 0;
   var tables = yield db(db.raw('INFORMATION_SCHEMA.tables')).select('table_name')
- .where('table_name', 'like', '%\_temp\_________\_____\_____\_____\_____________')
- .groupBy('table_name');
+    .where('table_name', 'like', '%\_temp\_________\_____\_____\_____\_____________')
+    .groupBy('table_name');
   if (!tables.length) {
     return 0;
   }
@@ -94,8 +93,8 @@ var swap = Bluebird.coroutine(function * swap(table, tempTable, remove, db, conf
   });
   return db.raw(`
       ${remove ? escape('DELETE from %I', table) : ''};
-      INSERT into ?? (${toFields.join(',')})
-      SELECT ${fromFields.join(',')} from ??
+      INSERT into ?? ("${toFields.join('","')}")
+      SELECT "${fromFields.join('","')}" from ??
       ${groupFields.length ? `group by ${groupFields.join(',')}` : ''};
   `,[table, tempTable]).batch().onSuccess(db.raw('DROP TABLE ??;', [tempTable])).onError(db.raw('DROP TABLE ??;', [tempTable]));
 });
@@ -125,10 +124,10 @@ function makeSchema(data) {
 }
 var getFields = Bluebird.coroutine(function * (db, tempTable) {
   let fields = yield db(db.raw('INFORMATION_SCHEMA.COLUMNS')).select('column_name', 'data_type')
-  .where({
-    table_name: tempTable // eslint-disable-line camelcase
-  })
-  .whereNotIn('column_name', ['cartodb_id', 'the_geom_webmercator', 'created_at', 'updated_at', 'the_geom']);
+    .where({
+      table_name: tempTable // eslint-disable-line camelcase
+    })
+    .whereNotIn('column_name', ['cartodb_id', 'the_geom_webmercator', 'created_at', 'updated_at', 'the_geom']);
   return {
     fields: fields.map(function (item) {
       return item.column_name;
