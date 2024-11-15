@@ -93,17 +93,20 @@ var swap = Bluebird.coroutine(function * swap(table, tempTable, remove, db, conf
   });
   // Modify fromFields to handle "trim" formatting correctly
   var modifiedFromFields = fromFields.map(field => {
-    if (typeof field == 'string') {
-      return escape.ident(field)
-    } else {
-      return field.toSQL().sql; // Add quotes to all other fields
+    if (typeof field === 'string') {
+      return `"${field}"`;
     }
+    if (typeof field.toSQL === 'function') {
+      const raw =  field.toSQL();
+      return raw && raw.sql;
+    }
+    
   });
   return db.raw(`
     ${remove ? escape('DELETE from %I', table) : ''};
-    INSERT into ?? (${toFields.join(',')})
+    INSERT into ?? ("${toFields.join('","')}")
     SELECT ${modifiedFromFields.join(',')} from ??
-    ${groupFields.length ? `group by ${groupFields.join(',')}` : ''};
+    ${groupFields.length ? `group by "${groupFields.join('","')}"` : ''};
   `, [table, tempTable]).batch().onSuccess(db.raw('DROP TABLE ??;', [tempTable])).onError(db.raw('DROP TABLE ??;', [tempTable]));
 });
 
